@@ -1,97 +1,140 @@
 import streamlit as st
 from sqlalchemy import create_engine
-import io
-import matplotlib.pyplot as plt
-import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+import plotly.express as px
 
-# Define pages as functions
-def home_page():
-    st.title("Home Page")
-    st.write("Welcome to the Home Page!")
 
 # Function to create a database connection using SQLAlchemy
 def create_db_connection():
-    db_url = "mysql+mysqlconnector://root:peter@localhost/shop_inventory"
-    return create_engine(db_url)
+    db_url = "mysql+mysqlconnector://root:peter@localhost/main_items"
+    engine = create_engine(db_url)
+    return engine
 
-# Define plotting functions
+
+# --- Fetch data from the database --- 
+def load_data():
+    engine = create_db_connection()
+    query = "SELECT * FROM items_table"
+    data = pd.read_sql(query, engine)
+    return data
+
+
+# --- plot the data in a scatter plot ---
+def plot_scatter_chart(data):
+    # Convert 'Bundles_Boxes' to numeric, setting errors to 'coerce'
+    data['Bundles_Boxes'] = pd.to_numeric(data['Bundles_Boxes'], errors='coerce')
+    
+    # Replace NaN values with a default size, e.g., 0 or the mean size
+    data['Bundles_Boxes'].fillna(0, inplace=True)
+    
+    # Calculate total and percentage
+    total_bundles = data['Bundles_Boxes'].sum()
+    data['Percentage'] = (data['Bundles_Boxes'] / total_bundles) * 100
+    
+    # Create the scatter plot
+    fig = px.scatter(
+        data_frame=data,
+        x='Description',
+        y='Percentage',
+        size='Bundles_Boxes',  # The size argument represents the size of each dot.
+        text='Bundles_Boxes',  # Add number of boxes as text
+        hover_data=['Bundles_Boxes'],  # Display bundles/boxes info on hover
+        labels={'Description': 'Item Description', 'Percentage': 'Percentage of Total Inventory'},
+        title='Percentage of Inventory by Item'
+    )
+    
+    # Update layout to adjust margins and text position
+    fig.update_layout(
+        margin=dict(l=20, r=20, t=20, b=20),
+        xaxis_tickangle=-45
+    )
+    # Update traces to adjust text position
+    fig.update_traces(textposition='middle center')  # Position text in the middle of the dots
+
+    return fig
+
+
+# --- plot data in a pie chart to display total inventory usage per Bundles/Boxes ---
 def plot_pie_chart(data):
-    type_data = data['Type'].value_counts()
-    plt.figure(figsize=(6, 6))
-    labels = [str(label) for label in type_data.index]
-    plt.pie(type_data, labels=labels, autopct='%1.1f%%')
-    plt.title('Distribution of Items by Type')
-    return plt.gcf()
+    # Calculate total bundles for percentage calculation
+    total_bundles = data['Bundles_Boxes'].sum()
+    
+    # Add a percentage column to the dataframe
+    data['Inventory_Percentage'] = (data['Bundles_Boxes'] / total_bundles) * 100
+    
+    # Create a pie chart with Plotly
+    fig = px.pie(
+        data_frame=data,
+        names='Description',
+        values='Inventory_Percentage',
+        title='Percentage of Inventory by Bundles/Boxes per Item'
+    )
 
-import matplotlib.ticker as ticker
+    # Update the legend layout
+    fig.update_layout(
+        legend=dict(
+            font=dict(size=9),  # Adjust font size
+            # Adjust legend positioning and size
+            yanchor="top",
+            y=1,
+            xanchor="right",
+            x=10,
+            # Experiment with these values
+            tracegroupgap=3,  # Adjust the spacing between legend groups
+            itemwidth=30      # Adjust the width reserved for each legend item
+        )
+    )
 
+    return fig
+
+# --- plot data into a bar chart ---
 def plot_bar_chart(data):
-    plt.figure(figsize=(12, 8))
-    descriptions = data['Description'].astype(str)
-    quantities = pd.to_numeric(data['Units/Pieces/Each'], errors='coerce').fillna(0)
-    
-    plt.bar(descriptions, quantities)
-    plt.xlabel('Description')
-    plt.ylabel('Units/Pieces/Each')
-    
-    # Rotate the x-tick labels to vertical to prevent overlap and set a smaller font size
-    plt.xticks(rotation=90, fontsize=8)
-    
-    # Format y-axis tick labels to show whole numbers
-    plt.gca().yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f'{int(x):,}'))  # Adding comma as thousands separator
-    
-    plt.title('Quantity of Each Item')
-    plt.tight_layout()
-    return plt.gcf()
+    fig = px.bar(data_frame=data, x='Description', y='Units_Pieces_Each', title='Item Description')
+    fig.update_layout(xaxis_tickangle=-45)
+    return fig
 
-
-# Define import_inventory_page function
-def import_inventory_page():
-    st.title("Import Inventory Sheet")
-    uploaded_file = st.file_uploader("Choose a file", type=['xlsx', 'csv'], key="inventory_sheet_uploader")
-
-    if uploaded_file is not None:
-        try:
-            data = pd.read_excel(uploaded_file, engine='openpyxl', sheet_name=0, header=3)
-            st.write('Column names:', data.columns.tolist())
-
-            required_columns = ['Type', 'Description', 'Units/Pieces/Each']
-            if all(column in data.columns for column in required_columns):
-                # Display the dataframe
-                st.dataframe(data)
-
-                # Plotting the pie chart
-                st.write('Distribution of Items by Type')
-                pie_chart = plot_pie_chart(data)
-                st.pyplot(pie_chart)
-
-                # Plotting the bar chart
-                st.write('Quantity of Each Item')
-                bar_chart = plot_bar_chart(data)
-                st.pyplot(bar_chart)
-
-            else:
-                st.error(f"Uploaded file is missing required columns: {', '.join(required_columns)}")
-        except Exception as e:
-            st.error(f"An error occurred: {e}")
-    else:
-        st.write("Please upload a file to view the inventory data and visualizations.")
-
-# Main app logic
-if __name__ == "__main__":
-    # Define your pages here
-    pages = {
-        "Home": home_page,
-        "Import Inventory Sheet": import_inventory_page
-    }
-
-    # Sidebar navigation
+def main():
+    st.title("Inventory Dashboard")
+    # Sidebar for navigation
     st.sidebar.title("Navigation")
-    selection = st.sidebar.radio("Go to", list(pages.keys()))
+    page = st.sidebar.radio("Choose a Page:", ["Inventory Overview", "Item Descriptions"])
+    # Load the data
+    data = load_data().copy()
 
-    # Render the selected page
-    page = pages[selection]
-    page()
+    # Display content based on the page selection
+    if page == "Inventory Overview":
+        # Description for the scatter chart
+        st.markdown("""
+        ### Scatter Chart of Inventory
+        This scatter chart represents the percentage of total inventory per item, with the size of each dot indicating the number of bundles or boxes for that item.
+        """)
+        # Plotting the scatter chart with full width of the page
+        scatter_chart = plot_scatter_chart(data)
+        st.plotly_chart(scatter_chart, use_container_width=True)
+
+        # Description for the pie chart
+        st.markdown("""
+        ### Pie Chart of Inventory Distribution
+        This pie chart displays same information as the Scatter Chart of Inventory, but gives a quick overview of inventory distribution.
+        """)
+        # Plotting the pie chart with full width of the page
+        pie_chart = plot_pie_chart(data)
+        st.plotly_chart(pie_chart, use_container_width=True)
+
+    elif page == "Item Descriptions":
+        # Description for the bar chart
+        st.markdown("""
+        ### Bar Chart of Item Descriptions
+        The bar chart below shows the number of units, pieces, or each item in the inventory, providing a detailed view of labels per item.
+        """)
+        # Plotting the bar chart
+        st.write('Item Description')
+        bar_chart = plot_bar_chart(data)
+        st.plotly_chart(bar_chart, use_container_width=True)
+
+
+# Run the main function when the script is executed
+if __name__ == "__main__":
+    main()
+
+
