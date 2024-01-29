@@ -1,140 +1,68 @@
 import streamlit as st
-from sqlalchemy import create_engine
 import pandas as pd
+from sqlalchemy import create_engine
 import plotly.express as px
 
+# Connection function
+def create_connection():
+    engine = create_engine('mysql+mysqlconnector://root:peter@localhost/main_items')
+    return engine.connect()
 
-# Function to create a database connection using SQLAlchemy
-def create_db_connection():
-    db_url = "mysql+mysqlconnector://root:peter@localhost/main_items"
-    engine = create_engine(db_url)
-    return engine
-
-
-# --- Fetch data from the database --- 
-def load_data():
-    engine = create_db_connection()
+def fetch_data():
+    conn = create_connection()
     query = "SELECT * FROM items_table"
-    data = pd.read_sql(query, engine)
-    return data
+    return pd.read_sql(query, conn)
+
+# Streamlit main page layout
+st.title("Inventory Dashboard")
+
+# Fetch and display data
+df = fetch_data()
+st.markdown("**Overall Inventory Data:**")
+st.dataframe(df, use_container_width=True)
+st.markdown("\n")
+st.markdown("\n")
+st.markdown("\n")
+
+# Description for bar chart
+st.markdown("\n**Bar Chart Description:**")
+st.markdown("***This bar chart displays the count of each item in the inventory. The count is categorized by whether the item is counted as single spools or as bundles/boxes.***")
+st.markdown("***You can choose in the drop down which items were counted as spools and not bundles/boxes style count.***")
 
 
-# --- plot the data in a scatter plot ---
-def plot_scatter_chart(data):
-    # Convert 'Bundles_Boxes' to numeric, setting errors to 'coerce'
-    data['Bundles_Boxes'] = pd.to_numeric(data['Bundles_Boxes'], errors='coerce')
-    
-    # Replace NaN values with a default size, e.g., 0 or the mean size
-    data['Bundles_Boxes'].fillna(0, inplace=True)
-    
-    # Calculate total and percentage
-    total_bundles = data['Bundles_Boxes'].sum()
-    data['Percentage'] = (data['Bundles_Boxes'] / total_bundles) * 100
-    
-    # Create the scatter plot
-    fig = px.scatter(
-        data_frame=data,
-        x='Description',
-        y='Percentage',
-        size='Bundles_Boxes',  # The size argument represents the size of each dot.
-        text='Bundles_Boxes',  # Add number of boxes as text
-        hover_data=['Bundles_Boxes'],  # Display bundles/boxes info on hover
-        labels={'Description': 'Item Description', 'Percentage': 'Percentage of Total Inventory'},
-        title='Percentage of Inventory by Item'
-    )
-    
-    # Update layout to adjust margins and text position
-    fig.update_layout(
-        margin=dict(l=20, r=20, t=20, b=20),
-        xaxis_tickangle=-45
-    )
-    # Update traces to adjust text position
-    fig.update_traces(textposition='middle center')  # Position text in the middle of the dots
+# User selection for count method
+all_items = df['Description'].unique()  # Or use 'BTN_SKU' if that's more appropriate
+selected_items_spools = st.multiselect('*Select Items to Count as Single Spools*', all_items, default=[])
 
-    return fig
+# Update DataFrame based on selection
+df['Count_Method'] = df['Description'].apply(lambda x: 'Spools' if x in selected_items_spools else 'Bundles/Boxes')
+
+# Bar graph for each item
+fig_bar = px.bar(df, x='Description', y='Bundles_Boxes_Spools', color='Count_Method', 
+                 title='Inventory Count for Each Item',
+                 labels={'Bundles_Boxes_Spools': 'Count'})
+fig_bar.update_layout(width=800, height=600, xaxis_tickangle=-45)
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# Prepare data for the new interactive bar chart
+df_grouped = df.groupby('Type').agg(
+    Total_Space=pd.NamedAgg(column='Bundles_Boxes_Spools', aggfunc='sum'),
+    Item_List=pd.NamedAgg(column='Description', aggfunc=lambda x: '<br>'.join(x))
+).reset_index()
 
 
-# --- plot data in a pie chart to display total inventory usage per Bundles/Boxes ---
-def plot_pie_chart(data):
-    # Calculate total bundles for percentage calculation
-    total_bundles = data['Bundles_Boxes'].sum()
-    
-    # Add a percentage column to the dataframe
-    data['Inventory_Percentage'] = (data['Bundles_Boxes'] / total_bundles) * 100
-    
-    # Create a pie chart with Plotly
-    fig = px.pie(
-        data_frame=data,
-        names='Description',
-        values='Inventory_Percentage',
-        title='Percentage of Inventory by Bundles/Boxes per Item'
-    )
-
-    # Update the legend layout
-    fig.update_layout(
-        legend=dict(
-            font=dict(size=9),  # Adjust font size
-            # Adjust legend positioning and size
-            yanchor="top",
-            y=1,
-            xanchor="right",
-            x=10,
-            # Experiment with these values
-            tracegroupgap=3,  # Adjust the spacing between legend groups
-            itemwidth=30      # Adjust the width reserved for each legend item
-        )
-    )
-
-    return fig
-
-# --- plot data into a bar chart ---
-def plot_bar_chart(data):
-    fig = px.bar(data_frame=data, x='Description', y='Units_Pieces_Each', title='Item Description')
-    fig.update_layout(xaxis_tickangle=-45)
-    return fig
-
-def main():
-    st.title("Inventory Dashboard")
-    # Sidebar for navigation
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Choose a Page:", ["Inventory Overview", "Item Descriptions"])
-    # Load the data
-    data = load_data().copy()
-
-    # Display content based on the page selection
-    if page == "Inventory Overview":
-        # Description for the scatter chart
-        st.markdown("""
-        ### Scatter Chart of Inventory
-        This scatter chart represents the percentage of total inventory per item, with the size of each dot indicating the number of bundles or boxes for that item.
-        """)
-        # Plotting the scatter chart with full width of the page
-        scatter_chart = plot_scatter_chart(data)
-        st.plotly_chart(scatter_chart, use_container_width=True)
-
-        # Description for the pie chart
-        st.markdown("""
-        ### Pie Chart of Inventory Distribution
-        This pie chart displays same information as the Scatter Chart of Inventory, but gives a quick overview of inventory distribution.
-        """)
-        # Plotting the pie chart with full width of the page
-        pie_chart = plot_pie_chart(data)
-        st.plotly_chart(pie_chart, use_container_width=True)
-
-    elif page == "Item Descriptions":
-        # Description for the bar chart
-        st.markdown("""
-        ### Bar Chart of Item Descriptions
-        The bar chart below shows the number of units, pieces, or each item in the inventory, providing a detailed view of labels per item.
-        """)
-        # Plotting the bar chart
-        st.write('Item Description')
-        bar_chart = plot_bar_chart(data)
-        st.plotly_chart(bar_chart, use_container_width=True)
-
-
-# Run the main function when the script is executed
-if __name__ == "__main__":
-    main()
-
-
+st.write("\n")
+st.write("\n")
+st.write("\n")
+st.write("\n")
+st.write("\n")
+st.write("\n")
+# Interactive bar chart for inventory space by item type with different colors for each type
+st.markdown("**Interactive Bar Chart Description:**")
+st.write("***This bar chart shows the distribution of inventory space by item type. Hover over each bar to see the list of items in that type.***")
+fig_type_space = px.bar(df_grouped, x='Type', y='Total_Space',
+                        color='Type',  # Assign colors based on 'Type'
+                        hover_data={'Type': False, 'Total_Space': True, 'Item_List': True},
+                        labels={'Total_Space': 'Total Inventory Space', 'Item_List': 'Items in Type'},
+                        title='Inventory Space by Item Type with Detailed Item List')
+st.plotly_chart(fig_type_space, use_container_width=True)
