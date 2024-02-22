@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
 import plotly.express as px
+import time # for loading delay
 
 # Connection function
 def create_connection():
@@ -18,8 +19,27 @@ st.title("Inventory Dashboard")
 
 # Fetch and display data
 df = fetch_data()
+
 st.markdown("**Overall Inventory Data:**")
+# Search Bar asking user to enter either item BTN_SKU or Description
+search_query = st.text_input("Enter BTN_SKU or Description to search:")
+if search_query:
+    search_results = df[(df['BTN_SKU'] == search_query) | (df['Description'].str.contains(search_query, case=False, na=False))]
+    if search_results.empty:
+        st.write("Item not found in inventory.")
+    else:
+        # Initialize progress bar
+        progress_bar = st.progress(0)
+
+        for percent_complete in range(100):
+            time.sleep(0.08)  # Sleep for a short time to simulate loading
+            progress_bar.progress(percent_complete + 1)
+
+        st.success("Item found!")
+        st.write("Item Data:")
+        st.dataframe(search_results)
 st.dataframe(df, use_container_width=True)
+
 st.markdown("\n")
 st.markdown("\n")
 st.markdown("\n")
@@ -31,10 +51,14 @@ st.markdown("***You can choose in the drop down which items were counted as spoo
 
 
 # User selection for count method
-all_items = df['Description'].unique()  # Or use 'BTN_SKU' if that's more appropriate
+all_items = df['Description'].unique()  # Or use 'BTN_SKU' column if better for you
+
+# selected_items_spools all items selected by user
+#  multi select dropdown, can select multiple items from the list 'all_items'
 selected_items_spools = st.multiselect('*Select Items to Count as Single Spools*', all_items, default=[])
 
-# Update DataFrame based on selection
+# Update DataFrame with column 'Count_Method', check if item's description is in the list of 'selected_items_spools', if the description is in the list, 
+# the count method is set to 'Spools' if not set it defaults to 'Bundles/Boxes'. 
 df['Count_Method'] = df['Description'].apply(lambda x: 'Spools' if x in selected_items_spools else 'Bundles/Boxes')
 
 # Bar graph for each item
@@ -57,6 +81,7 @@ st.write("\n")
 st.write("\n")
 st.write("\n")
 st.write("\n")
+
 # Interactive bar chart for inventory space by item type with different colors for each type
 st.markdown("**Interactive Bar Chart Description:**")
 st.write("***This bar chart shows the distribution of inventory space by item type. Hover over each bar to see the list of items in that type.***")
