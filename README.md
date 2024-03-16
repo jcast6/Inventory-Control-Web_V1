@@ -15,3 +15,12 @@ Here the user can see the overall inventory, item count, and inventory distribut
 
 ### This is a bar graph displaying overall distrubution of items in inventory by item type. If you hover over each bar you can see what items are in each category.
 ![bar_graph2](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/f1df6ade-871d-4b51-ab25-05c88d7eb3f7)
+
+### In the Add or Remove Item page the user can adjust the current count of items for a specific item by selecting the relevent BTN_SKU in a drop down selection.
+![inventory_adjustment_page](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/cc47c002-ec0e-4a51-84a5-0b4bd2fb86fd)
+
+### Once the user has selected and item there is a confirmation that the there has succesfully been a amount of items added for the select BTN_SKU.
+![added_item_count](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/ab645deb-f8d5-4095-8ce0-fc68578d3b7f)
+
+### To view recent changes the user can select a BTN_SKU and they can see what item has been changed with a timestamp included.
+![adjust_history](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/1515212b-ad7c-4a6a-8d1f-0073e59b9dd2)
