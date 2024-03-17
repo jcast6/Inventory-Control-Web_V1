@@ -18,6 +18,7 @@ This is a bar graph displaying overall distrubution of items in inventory by ite
 
 ### Add or Remove Item page
 In the Add or Remove Item page the user can adjust the current count of items for a specific item by selecting the relevent BTN_SKU in a drop down selection.
+
 ![inventory_adjustment_page](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/cc47c002-ec0e-4a51-84a5-0b4bd2fb86fd)
 
 Once the user has selected and item there is a confirmation that the there has succesfully been a amount of items added for the select BTN_SKU.
