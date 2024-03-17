@@ -25,5 +25,5 @@ Once the user has selected and item there is a confirmation that the there has s
 
 ![added_item_count](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/ab645deb-f8d5-4095-8ce0-fc68578d3b7f)
 
-To view recent changes the user can select a BTN_SKU and they can see what item has been changed with a timestamp included.
+To view recent changes the user can select a BTN_SKU and they can see what item has been changed with a timestamp included. Currently implementing a way for verification of item removal, and include employee details such as name or id, this can help show who removed an item.
 ![adjust_history](https://github.com/jcast6/Inventory-Control-Web_V1/assets/89822103/1515212b-ad7c-4a6a-8d1f-0073e59b9dd2)
