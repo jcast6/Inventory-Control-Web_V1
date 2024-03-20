@@ -2,26 +2,25 @@ import streamlit as st
 import mysql.connector
 from mysql.connector import Error
 import datetime
+from dotenv import load_dotenv 
+import os
+
+# Load environment variables
+load_dotenv()
 
 # Set the page layout to wide mode
 # st.set_page_config(layout="wide")
 
-# Database configuration
-host_name = 'localhost'
-user_name = 'root'
-user_password = 'peter'
-db_name = 'main_items'
 
 
-# Function to connect to the MySQL database
-def create_connection(host_name, user_name, user_password, db_name):
+def create_connection():
     connection = None
     try:
         connection = mysql.connector.connect(
-            host=host_name,
-            user=user_name,
-            passwd=user_password,
-            database=db_name
+            host=os.getenv('DB_HOST'),
+            user=os.getenv('DB_USER'),
+            passwd=os.getenv('DB_PASS'),
+            database=os.getenv('DB_NAME')
         )
         print("MySQL Database connection successful")
     except Error as err:
@@ -29,10 +28,10 @@ def create_connection(host_name, user_name, user_password, db_name):
     return connection
 
 # database configuration
-connection = create_connection(host_name, user_name, user_password, db_name)
+connection = create_connection()
 
 
-# Function to execute a modification query safely
+# execute a modification query safely
 def execute_query_safe(connection, query, data):
     cursor = connection.cursor()
     try:
@@ -45,7 +44,7 @@ def execute_query_safe(connection, query, data):
         cursor.close()  # Ensure the cursor is closed even if an error occurs
 
 
-# Function to read a query safely
+# read a query safely
 def read_query_safe(connection, query, data=None):
     cursor = connection.cursor()
     result = None
@@ -71,7 +70,7 @@ def insert_new_monthly_data(connection, data):
     execute_query_safe(connection, query, data)
 
 
-# Function to fetch the latest amount_after_change for a specific BTN_SKU
+# fetch the latest amount_after_change for a specific BTN_SKU
 def fetch_latest_amount_after_change(connection, btn_sku):
     query = """
     SELECT amount_after_change FROM current_amount_items
@@ -134,8 +133,7 @@ Month = st.text_input('Month')
 
 # Button to submit data
 if st.button('Submit New Monthly Data'):
-    # Open a new database connection
-    connection = create_connection(host_name, user_name, user_password, db_name)
+    connection = create_connection()
     
     if connection is not None:
         # Parameterized SQL query
