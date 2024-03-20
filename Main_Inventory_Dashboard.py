@@ -1,3 +1,18 @@
+"""
+Inven Control Version 1.1(Web Based)
+Created by: Juan Castaneda
+Created on: 1/05/24
+Description: Inven Control 1.1 is created using the Streamlit Framework. The application is designed to help with PLU label inventory mangement and 
+             to help analyze usage of PLU labels. The main goal is to simplify the tracking, removal, and addition of PLU labels spools used, with the. With Inven Control 1.1
+             the user can complete inventory count more efficiently and compare item counts to see monthly item usage trends, which in return can help 
+             decide if the user is using more or less items. The inventory forecast page is still being designed to create a more accurate forecast to help
+             with future PLU label needs.
+
+The software provided is a work in progress, with continuos updates applied. Please be sure to check for new versions on
+https://github.com/jcast6/Inventory-Control-Web_V1
+
+"""
+
 import streamlit as st
 import pandas as pd
 import mysql.connector
@@ -47,7 +62,24 @@ def fetch_data(selected_month_year):
 
 
 # Streamlit main page layout
+# Add logo with enhanced styling and positioned in the top-left corner
+col1, _ = st.columns([1, 10])  # Adjust the width of the column as needed
+with col1:
+    st.image("github_projects/borton_fruit_logo.png", width=400, use_column_width=False, 
+             caption = "This application helps the user analyze usage trends for Borton Fruit Packing Company(BPC) PLU labels in the PLU shop." 
+                       " You can also manage your inventory count, and take inventory for the month and upload the data to a MySQL database. "
+                       " By seeing these trends the user can determine future usage and needs of PLU lables in the future. " 
+                       " This application is constantly being updated to help with more effictive analysis and to provide a simple to use interface.",  # caption or description of application.
+             output_format = "auto",  # Output format of the image
+             channels = "RGB",  # Channels for the image
+             
+             )
+    
+
 st.title("Inventory Dashboard")
+# Add logo
+#st.image("github_projects/inven_con.png", use_column_width=True)  # Replace "path_to_your_logo" with the actual path to your logo image
+
 st.markdown("**<h1 style='font-size: 19px;'>This page allows you to view previous monthly data of PLU labels inventory and count.</h1>**", unsafe_allow_html=True)
 
 st.markdown("**<span style='text-decoration: underline; ; font-size: 19px;'>Overall Inventory Table:</span>**", unsafe_allow_html=True)
