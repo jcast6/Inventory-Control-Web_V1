@@ -9,7 +9,7 @@ Description: Inven Control 1.1 is created using the Streamlit Framework. The app
              with future PLU label needs.
 
 The software provided is a work in progress, with continuos updates applied. Please be sure to check for new versions on
-https://github.com/jcast6/Inventory-Control-Web_V1
+https://github.com/jcast6/
 
 """
 
@@ -19,6 +19,9 @@ import mysql.connector
 import plotly.express as px
 import time # for loading delay
 import datetime
+from mysql.connector import Error
+from dotenv import load_dotenv 
+import os 
 
 # Set the page layout to wide mode
 st.set_page_config(layout="wide")
@@ -28,19 +31,25 @@ current_year = datetime.datetime.now().year
 years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
 
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Function to connect to the database
 def create_connection():
+    connection = None
     try:
         connection = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            passwd='peter',
-            database='main_items'
+            host=os.getenv('DB_HOST'),
+            user=os.getenv('DB_USER'),
+            passwd=os.getenv('DB_PASS'),
+            database=os.getenv('DB_NAME')
         )
         print("MySQL Database connection successful")
-        return connection
-    except mysql.connector.Error as err:
+    except Error as err:
         print(f"Error: '{err}'")
-        return None
+    return connection
+
+db_connection = create_connection()
 
 
 def fetch_data(selected_month_year):
