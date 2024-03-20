@@ -34,7 +34,6 @@ years = list(range(current_year - 10, current_year + 1))  # Last 10 years and cu
 # Load environment variables from .env file
 load_dotenv()
 
-# Function to connect to the database
 def create_connection():
     connection = None
     try:
@@ -71,7 +70,6 @@ def fetch_data(selected_month_year):
 
 
 # Streamlit main page layout
-# Add logo with enhanced styling and positioned in the top-left corner
 col1, _ = st.columns([1, 10])  # Adjust the width of the column as needed
 with col1:
     st.image("github_projects/borton_fruit_logo.png", width=400, use_column_width=False, 
@@ -86,11 +84,7 @@ with col1:
     
 
 st.title("Inventory Dashboard")
-# Add logo
-#st.image("github_projects/inven_con.png", use_column_width=True)  # Replace "path_to_your_logo" with the actual path to your logo image
-
 st.markdown("**<h1 style='font-size: 19px;'>This page allows you to view previous monthly data of PLU labels inventory and count.</h1>**", unsafe_allow_html=True)
-
 st.markdown("**<span style='text-decoration: underline; ; font-size: 19px;'>Overall Inventory Table:</span>**", unsafe_allow_html=True)
 
 # Add a year selection widget
