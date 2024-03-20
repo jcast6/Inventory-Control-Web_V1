@@ -1,37 +1,42 @@
 import streamlit as st
-import mysql.connector
-from mysql.connector import Error
 import pandas as pd
+import mysql.connector
+import plotly.express as px
+from mysql.connector import Error
+import time  # for loading delay
+import datetime
+from dotenv import load_dotenv 
+import os 
+
+# Load environment variables
+load_dotenv()
 
 # Set the page layout to wide mode
 st.set_page_config(layout="wide")
 
-# Database configuration
-host_name = 'localhost'
-user_name = 'root'
-user_password = 'peter'
-db_name = 'main_items'
+# Assuming you have a limited range of years to choose from or calculate it dynamically
+current_year = datetime.datetime.now().year
+years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
 
-
-# Function to connect to the database
-def create_connection(host_name, user_name, user_password, db_name):
-    connection = None
+def create_connection():
     try:
         connection = mysql.connector.connect(
-            host=host_name,
-            user=user_name,
-            passwd=user_password,
-            database=db_name
+            host=os.getenv('DB_HOST'),
+            user=os.getenv('DB_USER'),
+            passwd=os.getenv('DB_PASS'),
+            database=os.getenv('DB_NAME')
         )
         print("MySQL Database connection successful")
-    except Error as err:
+        return connection
+    except mysql.connector.Error as err:
         print(f"Error: '{err}'")
-    return connection
+        return None
+    
+conn = create_connection()
 
-db_connection = create_connection(host_name, user_name, user_password, db_name)
 
 
-# Adjusted: Function to execute read queries and return results
+# execute read queries and return results
 def execute_read_query(connection, query):
     cursor = connection.cursor()
     try:
@@ -43,7 +48,7 @@ def execute_read_query(connection, query):
         return None
     
 
-# Function to execute a query
+# execute a query
 def execute_query(connection, query):
     cursor = connection.cursor()
     try:
@@ -54,7 +59,7 @@ def execute_query(connection, query):
         print(f"Error: '{err}'")
 
 
-# Function to get all BTN_SKU values
+# get all BTN_SKU values
 def get_all_btn_sku(connection):
     query = "SELECT DISTINCT BTN_SKU FROM items_table;"
     results = execute_read_query(connection, query)
@@ -66,7 +71,7 @@ def get_all_btn_sku(connection):
         return []  # Return an empty list if there are no results
 
 
-# Function to fetch the current total amount for a specific BTN_SKU
+# fetch the current total amount for a specific BTN_SKU
 def get_current_total_amount(connection, btn_sku):
     query = f"SELECT SUM(Amount_Change) FROM Current_Amount_Items WHERE BTN_SKU = '{btn_sku}';"
     results = execute_read_query(connection, query)
@@ -76,7 +81,7 @@ def get_current_total_amount(connection, btn_sku):
         return 0  # Return 0 if no records are found, indicating no previous changes
 
 
-# function to use parameterized queries for better security
+# parameterized queries for better security
 def adjust_item_amount(connection, btn_sku, amount_change):
     # Fetch current total before the change
     current_total_amount = get_current_total_amount(connection, btn_sku)
@@ -84,7 +89,7 @@ def adjust_item_amount(connection, btn_sku, amount_change):
     # Calculate the total after applying the change
     amount_after_change = amount_before_change + amount_change
     
-    # Use parameterized query to prevent SQL injection
+    # parameterized query to prevent SQL injection
     query = """
     INSERT INTO Current_Amount_Items (BTN_SKU, Amount_Change, amount_before_change, amount_after_change) 
     VALUES (%s, %s, %s, %s);
@@ -99,7 +104,7 @@ def adjust_item_amount(connection, btn_sku, amount_change):
     except Error as err:
         print(f"Error: '{err}'")
 
-# Function to get adjustment history for a specific BTN_SKU
+#  get adjustment history for a specific BTN_SKU
 def get_adjustment_history(connection, btn_sku):
     query = """
     SELECT BTN_SKU, amount_before_change, Amount_Change, amount_after_change, Change_Timestamp 
@@ -132,7 +137,7 @@ def display_history(connection, btn_sku):
 
 # Page header
 st.title("Inventory Adjustment")
-btn_skus = get_all_btn_sku(db_connection)  # Fetch all BTN_SKU values
+btn_skus = get_all_btn_sku(conn)  # Fetch all BTN_SKU values
 
 
 # - 'with st.form("adjust_item_amount_form"):' This line starts the form block. 
@@ -150,7 +155,7 @@ with st.form("adjust_item_amount_form"):
     amount_change = st.number_input("Amount Change (positive to add, negative to remove)", step=1)
     submitted = st.form_submit_button("Adjust Amount")
     if submitted:
-        adjust_item_amount(db_connection, btn_sku, amount_change)
+        adjust_item_amount(conn, btn_sku, amount_change)
         if amount_change > 0:
             st.success(f"Added {amount_change} items successfully!")
         else:
@@ -160,13 +165,12 @@ st.write("\n")
 st.write("\n")
 st.write("\n")
 
-# Example of a custom title with a larger font size using HTML in Markdown
+# custom title with a larger font size using HTML in Markdown
 st.markdown("<h2 style='font-size: 24px;'>Select BTN_SKU to view history</h2>", unsafe_allow_html=True)
 
 st.markdown("***Changes are displayed from oldest at the top to most recent at the bottom of the log.***")
-# This ensures accessibility while allowing your custom styled title to serve as the main visual label
 btn_sku_history = st.selectbox("Select BTN_SKU (This label is for accessibility purposes)", btn_skus, key="history_selectbox", label_visibility="collapsed")
 
 display_history_button = st.button("Click to Display Adjustment History")
 if display_history_button:
-    display_history(db_connection, btn_sku_history)
+    display_history(conn, btn_sku_history)
