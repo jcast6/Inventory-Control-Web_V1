@@ -28,7 +28,7 @@ def create_connection(host_name, user_name, user_password, db_name):
         print(f"Error: '{err}'")
     return connection
 
-# create the database the connection
+# database configuration
 connection = create_connection(host_name, user_name, user_password, db_name)
 
 
