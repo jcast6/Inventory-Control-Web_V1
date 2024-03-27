@@ -1,7 +1,10 @@
+import pandas as pd
+import numpy as np
 import streamlit as st
 import mysql.connector
 from mysql.connector import Error
 import datetime
+from datetime import date 
 from dotenv import load_dotenv 
 import os
 
@@ -10,7 +13,6 @@ load_dotenv()
 
 # Set the page layout to wide mode
 # st.set_page_config(layout="wide")
-
 
 
 def create_connection():
@@ -58,14 +60,14 @@ def read_query_safe(connection, query, data=None):
     except Error as err:
         print(f"Error: '{err}'")
     finally:
-        cursor.close()  # Ensure the cursor is closed even if an error occurs
+        cursor.close()
 
 
 # Safe way to insert data
 def insert_new_monthly_data(connection, data):
     query = """
-    INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Lead_Time, Month) 
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+    INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month) 
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
     execute_query_safe(connection, query, data)
 
@@ -82,16 +84,28 @@ def fetch_latest_amount_after_change(connection, btn_sku):
         return result[0][0]
     else:
         return 0  # Return 0 if there's no record for the selected BTN_SKU
+    
 
 
 # Streamlit interface
 st.title('Enter Monthly Data')
 
-# Initialize the session state for recent changes if it does not exist
+# selectbox for year selection with a range of years
+year = st.selectbox('Select Year', list(range(2020, 2031)), index=date.today().year - 2020)
+
+# selectbox for month selection with all months
+months = ["January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December"]
+month = st.selectbox('Select Month', months, index=date.today().month - 1)
+
+# Format the selected month and year into the desired format for storage
+Month = f"{month} {year}"
+
+# session state for recent changes if it does not exist
 if 'recent_changes' not in st.session_state:
     st.session_state['recent_changes'] = []
 
-# Fetch distinct BTN_SKU options from the database
+# get distinct BTN_SKU options from the database
 btn_sku_query = "SELECT DISTINCT BTN_SKU FROM items_table ORDER BY BTN_SKU;"
 btn_sku_results = read_query_safe(connection, btn_sku_query)
 btn_sku_options = [result[0] for result in btn_sku_results]
@@ -127,9 +141,8 @@ st.text_input('Vendor', Vendor)
 Pallets = st.number_input('Pallets', step=1)
 Units_Pieces_Each = st.number_input('Units/Pieces Each', step=1)
 # Auto-fill the Bundles/Boxes/Spools input with the latest amount_after_change
-Bundles_Boxes_Spools = st.number_input('Bundles/Boxes/Spools', step=1, value=latest_amount_after_change)
-Lead_Time = st.number_input('Lead Time', step=1)
-Month = st.text_input('Month')
+Bundles_Boxes_Spools = st.number_input('Bundles_Boxes_Spools', step=1, value=latest_amount_after_change)
+# Month = st.text_input('Month')
 
 # Button to submit data
 if st.button('Submit New Monthly Data'):
@@ -138,10 +151,10 @@ if st.button('Submit New Monthly Data'):
     if connection is not None:
         # Parameterized SQL query
         query = """
-        INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Lead_Time, Month) 
+        INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month) 
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
-        data = (selected_btn_sku, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Lead_Time, Month)
+        data = (selected_btn_sku, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month)
         
         # Execute the query safely
         execute_query_safe(connection, query, data)
@@ -154,7 +167,7 @@ if st.button('Submit New Monthly Data'):
         change_record = {
             'BTN_SKU': selected_btn_sku,
             'Description': Description,
-            'Timestamp': datetime.datetime.now().strftime('%m-%d-%Y %H:%M:%S')
+            'Timestamp': Month  
         }
         # Append the new record to the session state list
         st.session_state['recent_changes'].insert(0, change_record)  # Insert at the beginning to show recent first
