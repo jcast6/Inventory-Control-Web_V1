@@ -53,6 +53,7 @@ db_connection = create_connection()
 
 def fetch_data(selected_month_year):
     conn = create_connection()
+    # Initialize progress bar
     if conn is not None:
         cursor = conn.cursor()
         query = f"SELECT * FROM items_table WHERE Month = '{selected_month_year}'"
@@ -110,7 +111,7 @@ if search_query:
         progress_bar = st.progress(0)
 
         for percent_complete in range(100):
-            time.sleep(0.0030)  # Sleep for a short time to simulate loading
+            time.sleep(0.0030)
             progress_bar.progress(percent_complete + 1)
 
         st.success("Item found!")
@@ -132,7 +133,7 @@ st.markdown("You can choose in the drop down which items were counted as spools 
 all_items = df['Description'].unique()  # Or use 'BTN_SKU' column if better for you
 
 # selected_items_spools all items selected by user
-#  multi select dropdown, can select multiple items from the list 'all_items'
+# multi select dropdown, can select multiple items from the list 'all_items'
 selected_items_spools = st.multiselect('Select Items to Count as Single Spools', all_items, default=[])
 
 # Update DataFrame with column 'Count_Method', check if item's description is in the list of 'selected_items_spools', if the description is in the list, 
@@ -169,3 +170,42 @@ fig_type_space = px.bar(df_grouped, x='Type', y='Total_Space',
                         labels={'Total_Space': 'Total Inventory Space', 'Item_List': 'Items in Type'},
                         title=f'Inventory Space by Item Type with Detailed Item List - {selected_month}')
 st.plotly_chart(fig_type_space, use_container_width=True)
+
+# Monthly Comparison section with plot type selection
+st.markdown("## Monthly Comparison")
+plot_type = st.radio("Select Plot Type:", ["Bar Chart", "Scatter Plot"], index=0)
+
+# create list of month-year combinations and allow up to 4 selections for comparison
+month_years = [f"{month} {year}" for year in range(datetime.datetime.now().year - 10, datetime.datetime.now().year + 1) for month in ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']]
+selected_month_years = st.multiselect("Select up to 4 months for comparison:", month_years, key='month_year_select')
+
+# Compare Data button
+if st.button('Compare Data', key='compare_data'):
+    comparison_data = pd.DataFrame()
+    
+    # Fetch data for each selected month-year and concatenate
+    for selected_month_year in selected_month_years:
+        month_data = fetch_data(selected_month_year)
+        month_data['Month_Year'] = selected_month_year  # Distinguish each month in the combined DataFrame
+        comparison_data = pd.concat([comparison_data, month_data], ignore_index=True)
+    
+    if not comparison_data.empty:
+        st.success('Comparison data successfully loaded!')
+        
+        # Plot based on selected plot type and make adjustments to the figure
+        if plot_type == "Bar Chart":
+            fig = px.bar(comparison_data, x='Description', y='Bundles_Boxes_Spools', color='Month_Year', barmode='group',
+                         title='Monthly Comparison of Bundles/Boxes/Spools')
+        elif plot_type == "Scatter Plot":
+            fig = px.scatter(comparison_data, x='Description', y='Bundles_Boxes_Spools', color='Month_Year',
+                             title='Monthly Comparison of Bundles/Boxes/Spools', hover_data=['Month_Year'])
+        
+        # Update the figure with a larger size
+        fig.update_layout(width=1000, height=600)  # Adjust the size as needed
+        
+        # Update y-axis ticks for better granularity
+        fig.update_yaxes(dtick=5)  # Adjust dtick value based on your data range for desired tick frequency
+        
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.error('No data found for the selected months.')
