@@ -12,11 +12,12 @@ import os
 load_dotenv()
 
 # Set the page layout to wide mode
-st.set_page_config(layout="wide")
+# st.set_page_config(layout="wide")
 
 # Assuming you have a limited range of years to choose from or calculate it dynamically
 current_year = datetime.datetime.now().year
 years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
+
 
 def create_connection():
     try:
@@ -33,7 +34,6 @@ def create_connection():
         return None
     
 conn = create_connection()
-
 
 
 # execute read queries and return results
@@ -104,6 +104,7 @@ def adjust_item_amount(connection, btn_sku, amount_change):
     except Error as err:
         print(f"Error: '{err}'")
 
+
 #  get adjustment history for a specific BTN_SKU
 def get_adjustment_history(connection, btn_sku):
     query = """
@@ -116,6 +117,7 @@ def get_adjustment_history(connection, btn_sku):
     cursor.execute(query, (btn_sku,))
     history = cursor.fetchall()
     return history
+
 
 # adjustment history log
 def display_history(connection, btn_sku):
@@ -139,16 +141,6 @@ def display_history(connection, btn_sku):
 st.title("Inventory Adjustment")
 btn_skus = get_all_btn_sku(conn)  # Fetch all BTN_SKU values
 
-
-# - 'with st.form("adjust_item_amount_form"):' This line starts the form block. 
-# - "adjust_item_amount_form" is the key for the form, which should be unique within the app.
-# - Inside the form, you've added several widgets (st.write, st.selectbox, st.number_input) that 
-#  allow users to input data. All these inputs are part of the form.
-# - st.form_submit_button("Adjust Amount"): This button is used to submit the form. 
-#  When the user clicks this button, all the inputs within the form are submitted together. 
-#  The submitted variable captures the state of the submission (True if the form has been submitted, False otherwise).
-# - After the form is submitted (if submitted:), you process the input data (adjust_item_amount(db_connection, btn_sku, amount_change)) 
-#  and display a success message using st.success based on whether amount_change is positive or negative.
 with st.form("adjust_item_amount_form"):
     st.write("Adjust an Item's Amount")
     btn_sku = st.selectbox("Select BTN_SKU", btn_skus)
@@ -173,4 +165,19 @@ btn_sku_history = st.selectbox("Select BTN_SKU (This label is for accessibility 
 
 display_history_button = st.button("Click to Display Adjustment History")
 if display_history_button:
-    display_history(conn, btn_sku_history)
+    with st.spinner('Loading Adjustment History...'):
+        # progress bar
+        progress_bar = st.progress(0)
+        
+        # Divide the loading process into several steps
+        for percent_complete in range(100):
+            # Update progress bar with each step
+            progress_bar.progress(percent_complete + 1)
+            # Sleep to simulate loading time
+            time.sleep(0.05)
+        
+        # Now call the function to display the history
+        display_history(conn, btn_sku_history)
+
+    # ensure that the progress bar reaches 100%
+    progress_bar.progress(100)
