@@ -8,6 +8,9 @@ Description: Inven Control 1.1 is created using the Streamlit Framework. The app
              decide if the user is using more or less items. The inventory forecast page is still being designed to create a more accurate forecast to help
              with future PLU label needs.
 
+The software provided is a work in progress, with continuos updates applied. Please be sure to check for new versions on
+https://github.com/jcast6/
+
 """
 import streamlit as st
 import pandas as pd
@@ -168,7 +171,7 @@ df['Count_Method'] = df['Description'].apply(lambda x: 'Spools' if x in selected
 fig_bar = px.bar(df, x = 'Description', y = 'Bundles_Boxes_Spools', color = 'Count_Method', 
                  title=f'Inventory Count for Each Item - {selected_month}',
                  labels={'Bundles_Boxes_Spools': 'Count'})
-fig_bar.update_layout(width = 800, height = 600, xaxis_tickangle = -45)
+fig_bar.update_layout(height = 600, xaxis_tickangle = -45)
 st.plotly_chart(fig_bar, use_container_width = True)
 
 # Prepare data for the new interactive bar chart
@@ -189,7 +192,7 @@ if not df.empty:
     df_grouped = df.groupby('item_type').agg(
         Total_Space = pd.NamedAgg(column = 'Bundles_Boxes_Spools', aggfunc = 'sum'),
         # Handle missing data by using a placeholder if no descriptions are present
-        Item_List=pd.NamedAgg(column = 'Description', aggfunc = lambda x: '<br>'.join(set(x)) if x.any() else 'No data')
+        Item_List = pd.NamedAgg(column = 'Description', aggfunc = lambda x: '<br>'.join(set(x)) if x.any() else 'No data')
     ).reset_index()
 
     print(f"Grouped data for {selected_month_year}:")
@@ -233,7 +236,7 @@ if not df.empty:
                 """,
                 unsafe_allow_html = True,
         )
-        col.metric(label="Inventory Amount Used", value = f"{row['Total_Space']:.2f}", delta = f"{percentage:.2f}%", delta_color = 'off')
+        col.metric(label="Inventory Space Used", value = f"{row['Total_Space']:.2f}", delta = f"{percentage:.2f}%", delta_color = 'off')
 else:
     st.error("No data available for the selected period.")
 
@@ -276,11 +279,11 @@ for month, year in selected_months_years:
 # insert extracted results into a dataframe
 df_results = pd.DataFrame(data_results)
 
-# Visualization using Plotly
 fig = pg.Figure()
 for item in selected_items:
     df_filtered = df_results[df_results['Item'] == item]
-    fig.add_trace(pg.Bar(name = item, 
+    #fig.add_trace(pg.Bar(name = item,
+    fig.add_trace(pg.Scatter(name=item, 
                          x = df_filtered['MonthYear'], 
                          y = df_filtered['Value'], 
                          marker_color = color_palette[selected_items.index(item) % len(color_palette)]
@@ -290,12 +293,12 @@ fig.update_layout(
     title = 'Monthly data comparison for selected item(s)',
     xaxis_title = "Month/Year",
     yaxis_title = "Bundles/Boxes/Spools",
-    barmode = 'group',
-    height = 600 
+    #barmode = 'group',
+    height = 800,
 )
 
 # Update y-axis increment to 5
-fig.update_yaxes(tick0 = 0, dtick = 4)
+fig.update_yaxes(tick0 = 0, dtick = 10)
 
 # Display the chart
-st.plotly_chart(fig, use_container_width = True)
+st.plotly_chart(fig)
