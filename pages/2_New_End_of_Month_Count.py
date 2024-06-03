@@ -14,26 +14,24 @@ load_dotenv()
 # Set the page layout to wide mode
 # st.set_page_config(layout="wide")
 
-
 def create_connection():
     connection = None
     try:
         connection = mysql.connector.connect(
-            host=os.getenv('DB_HOST'),
-            user=os.getenv('DB_USER'),
-            passwd=os.getenv('DB_PASS'),
-            database=os.getenv('DB_NAME')
+            host = os.getenv('DB_HOST'),
+            user = os.getenv('DB_USER'),
+            passwd = os.getenv('DB_PASS'),
+            database = os.getenv('DB_NAME')
         )
         print("MySQL Database connection successful")
     except Error as err:
         print(f"Error: '{err}'")
     return connection
 
-# database configuration
+# Database configuration
 connection = create_connection()
 
-
-# execute a modification query safely
+# Execute a modification query safely
 def execute_query_safe(connection, query, data):
     cursor = connection.cursor()
     try:
@@ -43,10 +41,8 @@ def execute_query_safe(connection, query, data):
     except Error as err:
         print(f"Error: '{err}'")
     finally:
-        cursor.close()  # Ensure the cursor is closed even if an error occurs
+        cursor.close()
 
-
-# read a query safely
 def read_query_safe(connection, query, data=None):
     cursor = connection.cursor()
     result = None
@@ -62,72 +58,46 @@ def read_query_safe(connection, query, data=None):
     finally:
         cursor.close()
 
-
-# Safe way to insert data
 def insert_new_monthly_data(connection, data):
     query = """
-    INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month) 
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+    INSERT INTO items_table (BTN_SKU, Description, item_type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month, Spools) 
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
     execute_query_safe(connection, query, data)
 
-
-# fetch the latest amount_after_change for a specific BTN_SKU
-def fetch_latest_amount_after_change(connection, btn_sku):
-    query = """
-    SELECT amount_after_change FROM current_amount_items
-    WHERE BTN_SKU = %s
-    ORDER BY Change_Timestamp DESC LIMIT 1;
-    """
-    result = read_query_safe(connection, query, (btn_sku,))
-    if result and result[0][0] is not None:
-        return result[0][0]
-    else:
-        return 0  # Return 0 if there's no record for the selected BTN_SKU
-    
-
-
-# Streamlit interface
 st.title('Enter Monthly Data')
 
-# selectbox for year selection with a range of years
-year = st.selectbox('Select Year', list(range(2020, 2031)), index=date.today().year - 2020)
+year = st.selectbox('Select Year', list(range(2020, 2031)), index = date.today().year - 2020)
 
-# selectbox for month selection with all months
 months = ["January", "February", "March", "April", "May", "June", "July",
           "August", "September", "October", "November", "December"]
-month = st.selectbox('Select Month', months, index=date.today().month - 1)
+month = st.selectbox('Select Month', months, index  =date.today().month - 1)
 
 # Format the selected month and year into the desired format for storage
 Month = f"{month} {year}"
 
-# session state for recent changes if it does not exist
+# Session state for recent changes if it does not exist
 if 'recent_changes' not in st.session_state:
     st.session_state['recent_changes'] = []
 
-# get distinct BTN_SKU options from the database
 btn_sku_query = "SELECT DISTINCT BTN_SKU FROM items_table ORDER BY BTN_SKU;"
 btn_sku_results = read_query_safe(connection, btn_sku_query)
 btn_sku_options = [result[0] for result in btn_sku_results]
 
-# Dropdown to select BTN_SKU
 selected_btn_sku = st.selectbox('Select BTN_SKU', btn_sku_options)
 
 # Auto-fill the remaining fields based on BTN_SKU selected
 Description, Type, Count_Details, Vendor = '', '', '', ''
 if selected_btn_sku:
-    # Fetch the latest amount_after_change for the selected BTN_SKU
-    latest_amount_after_change = fetch_latest_amount_after_change(connection, selected_btn_sku)
-    
 
     # Since the BTN_SKU is distinct, the details should come from the most recent entry or a specific criterion
-    details_query = f"""
-    SELECT Description, Type, Count_Details, Vendor 
+    details_query = """
+    SELECT Description, item_type, Count_Details, Vendor 
     FROM items_table 
-    WHERE BTN_SKU = '{selected_btn_sku}'
+    WHERE BTN_SKU = %s
     ORDER BY BTN_SKU DESC LIMIT 1;
     """
-    details_results = read_query_safe(connection, details_query)
+    details_results = read_query_safe(connection, details_query, (selected_btn_sku,))
     if details_results:
         Description, Type, Count_Details, Vendor = details_results[0]
 
@@ -137,45 +107,72 @@ st.text_input('Type', Type)
 st.text_input('Count Details', Count_Details)
 st.text_input('Vendor', Vendor)
 
-# user Input fields
-Pallets = st.number_input('Pallets', step=1)
-Units_Pieces_Each = st.number_input('Units/Pieces Each', step=1)
-# Auto-fill the Bundles/Boxes/Spools input with the latest amount_after_change
-Bundles_Boxes_Spools = st.number_input('Bundles_Boxes_Spools', step=1, value=latest_amount_after_change)
-# Month = st.text_input('Month')
+# User input fields
+Pallets = st.number_input('Pallets', step = 1, min_value = 0)
+Units_Pieces_Each = st.number_input('Units/Pieces Each', step = 1, min_value = 0)
+# Input for Bundles_Boxes_Spools
+Bundles_Boxes_Spools = st.text_input('Bundles_Boxes_Spools')
 
-# Button to submit data
+# Check if the input contains "spools" or "rolls"
+spools = 0
+if "spools" in Bundles_Boxes_Spools.lower() or "rolls" in Bundles_Boxes_Spools.lower():
+    spools = 1
+
+# Remove non-numeric characters from Bundles_Boxes_Spools to get the numeric value
+Bundles_Boxes_Spools = ''.join(filter(str.isdigit, Bundles_Boxes_Spools))
+Bundles_Boxes_Spools = int(Bundles_Boxes_Spools) if Bundles_Boxes_Spools else 0
+
+def validate_inputs(description, item_type, count_details, vendor, pallets, units_pieces_each, bundles_boxes_spools):
+    if not description:
+        return "Description cannot be empty."
+    if not item_type:
+        return "Type cannot be empty."
+    if not count_details:
+        return "Count Details cannot be empty."
+    if not vendor:
+        return "Vendor cannot be empty."
+    if pallets < 0:
+        return "Pallets cannot be negative."
+    if units_pieces_each < 0:
+        return "Units/Pieces Each cannot be negative."
+    if bundles_boxes_spools < 0:
+        return "Bundles/Boxes/Spools cannot be negative or zero."
+    if pallets > 10:
+        return "Pallets is too large."
+    if units_pieces_each > 1000000000:
+        return "Units/Pieces Each is too large."
+    if bundles_boxes_spools > 10000:
+        return "Bundles/Boxes/Spools is too large."
+    return None
+
 if st.button('Submit New Monthly Data'):
-    connection = create_connection()
+    error_message = validate_inputs(Description, Type, Count_Details, Vendor, Pallets, Units_Pieces_Each, Bundles_Boxes_Spools)
     
-    if connection is not None:
-        # Parameterized SQL query
-        query = """
-        INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-        """
-        data = (selected_btn_sku, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month)
-        
-        # Execute the query safely
-        execute_query_safe(connection, query, data)
-        
-        # Close the connection after the query execution
-        connection.close()
-        print("Database connection closed.")
-        
-        # Record the change with a timestamp in the session state
-        change_record = {
-            'BTN_SKU': selected_btn_sku,
-            'Description': Description,
-            'Timestamp': Month  
-        }
-        # Append the new record to the session state list
-        st.session_state['recent_changes'].insert(0, change_record)  # Insert at the beginning to show recent first
+    if error_message:
+        st.error(error_message)
     else:
-        st.error("Failed to connect to the database.")
+        connection = create_connection()
+        
+        if connection is not None:
+            # Prepare data for insertion
+            data = (selected_btn_sku, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month, spools)
+            
+            # Use the insert_new_monthly_data function
+            insert_new_monthly_data(connection, data)
+            
+            connection.close()
+            print("Database connection closed.")
+            
+            # Record the change with a timestamp in the session state
+            change_record = {
+                'BTN_SKU': selected_btn_sku,
+                'Description': Description,
+                'Timestamp': Month  
+            }
+            # add the new record to the session state list
+            st.session_state['recent_changes'].insert(0, change_record)  # Insert at the beginning to show recent first
+        else:
+            st.error("Failed to connect to the database.")
 
-# Display a recent changes log
 st.subheader('Recent Changes Log')
-# Display the session state recent changes as a table
 st.table(st.session_state['recent_changes'])
-
