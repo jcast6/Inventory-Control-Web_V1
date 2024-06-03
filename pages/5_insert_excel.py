@@ -1,9 +1,10 @@
-from typing import Tuple, List
+import streamlit as st
 import pandas as pd
 import os
-import mysql
+import mysql.connector
 from mysql.connector import MySQLConnection, Error
 import re
+from typing import Tuple, List
 
 def create_connection():
     connection = None
@@ -19,8 +20,6 @@ def create_connection():
         print(f"Error: '{err}'")
     return connection
 
-
-# execute a modification query safely
 def execute_query_safe(connection, query, data):
     cursor = connection.cursor()
     try:
@@ -30,25 +29,28 @@ def execute_query_safe(connection, query, data):
     except Error as err:
         print(f"Error: '{err}'")
     finally:
-        cursor.close() 
+        cursor.close()
 
+def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    # Strip leading/trailing spaces from string columns
+    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    
+    # Convert numerical columns to appropriate types
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='ignore')
 
-def insert_data_from_excel(connection: MySQLConnection, file_path: str):
-    # Read data from an Excel file and insert it into the database
-    # Read the Excel file into a pandas DataFrame
-    df = pd.read_excel(file_path)
+    return df
 
-    # replace all  NaN values with 0 (for numerical columns)
+def insert_data_from_excel(connection: MySQLConnection, df: pd.DataFrame):
+    # replace all NaN values with 0 (for numerical columns)
     df = df.fillna(0)
 
     # Process Bundles_Boxes_Spools to set the Spools column and extract numbers
     def process_bundles_boxes_spools(row):
-        # Check if 'spools' or 'roll' is in the data, set Spools column value to 1 if this is the case
-        if 'spools' in str(row['Bundles_Boxes_Spools']).lower() or 'roll' in str(row['Bundles_Boxes_Spools']).lower():
+        if any(word in str(row['Bundles_Boxes_Spools']).lower() for word in ['spools', 'roll', 'rolls']):
             row['Spools'] = 1
         else:
             row['Spools'] = 0
-        # Extract the first number found in the string and use it as the value
         match = re.search(r'\d+', str(row['Bundles_Boxes_Spools']))
         if match:
             row['Bundles_Boxes_Spools'] = int(match.group())
@@ -60,17 +62,34 @@ def insert_data_from_excel(connection: MySQLConnection, file_path: str):
 
     # insert data query, matching the columns to the DataFrame's columns
     query = """
-    INSERT INTO items_table (BTN_SKU, Description, Type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month, Spools) 
+    INSERT INTO items_table (BTN_SKU, Description, item_type, Count_Details, Vendor, Pallets, Bundles_Boxes_Spools, Units_Pieces_Each, Month, Spools) 
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
 
-    # for loop over the DataFrame rows and insert each row into the database
     for index, row in df.iterrows():
-        data = tuple(row[col] for col in ['BTN_SKU', 'Description', 'Type', 'Count_Details', 'Vendor', 'Pallets', 'Bundles_Boxes_Spools', 'Units_Pieces_Each', 'Month', 'Spools'])
+        data = tuple(row[col] for col in ['BTN_SKU', 'Description', 'item_type', 'Count_Details', 'Vendor', 'Pallets', 'Bundles_Boxes_Spools', 'Units_Pieces_Each', 'Month', 'Spools'])
         execute_query_safe(connection, query, data)
 
+# Streamlit App Code
+st.title("Excel File Uploader and Previewer")
 
-connection = create_connection()
-if connection:
-     insert_data_from_excel(connection, 'C:/Users/pimpd/Desktop/inven_count_feb_2024.xlsx')
-     connection.close()
+# File uploader
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+
+if uploaded_file is not None:
+    # Display the file preview
+    df = pd.read_excel(uploaded_file)
+    
+    # Clean the DataFrame to ensure compatibility
+    df = clean_dataframe(df)
+
+    st.write("Preview of uploaded file:")
+    st.dataframe(df)
+
+    # Process the uploaded file and insert data into the database
+    if st.button("Insert Data into Database"):
+        connection = create_connection()
+        if connection:
+            insert_data_from_excel(connection, df)
+            connection.close()
+            st.success("Data inserted successfully!")
