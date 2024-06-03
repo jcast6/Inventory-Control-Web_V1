@@ -3,10 +3,10 @@ import pandas as pd
 import mysql.connector
 import plotly.express as px
 from mysql.connector import Error
-import time  # for loading delay
 import datetime
 from dotenv import load_dotenv 
 import os 
+import time
 
 # Load environment variables
 load_dotenv()
@@ -14,10 +14,8 @@ load_dotenv()
 # Set the page layout to wide mode
 # st.set_page_config(layout="wide")
 
-# Assuming you have a limited range of years to choose from or calculate it dynamically
 current_year = datetime.datetime.now().year
 years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
-
 
 def create_connection():
     try:
@@ -35,12 +33,14 @@ def create_connection():
     
 conn = create_connection()
 
-
 # execute read queries and return results
-def execute_read_query(connection, query):
+def execute_read_query(connection, query, params=None):
     cursor = connection.cursor()
     try:
-        cursor.execute(query)
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
         result = cursor.fetchall()  # Fetches all rows of a query result
         return result
     except Error as err:
@@ -49,42 +49,50 @@ def execute_read_query(connection, query):
     
 
 # execute a query
-def execute_query(connection, query):
+def execute_query(connection, query, params=None):
     cursor = connection.cursor()
     try:
-        cursor.execute(query)
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
         connection.commit()
         print("Query successful")
     except Error as err:
         print(f"Error: '{err}'")
 
 
-# get all BTN_SKU values
-def get_all_btn_sku(connection):
-    query = "SELECT DISTINCT BTN_SKU FROM items_table;"
+# get all BTN_SKU and Description values
+def get_all_btn_sku_and_description(connection):
+    query = "SELECT BTN_SKU, Description FROM items_table;"
     results = execute_read_query(connection, query)
     # Check if results is not None and not empty
     if results:
-        # Extracting the first column from each row
-        return [result[0] for result in results]
+        # Combine BTN_SKU and Description into a user-friendly string
+        return [f"{result[0]} - {result[1]}" for result in results]
     else:
         return []  # Return an empty list if there are no results
 
 
-# fetch the current total amount for a specific BTN_SKU
-def get_current_total_amount(connection, btn_sku):
-    query = f"SELECT SUM(Amount_Change) FROM Current_Amount_Items WHERE BTN_SKU = '{btn_sku}';"
-    results = execute_read_query(connection, query)
+# fetch the most current total amount for a specific BTN_SKU
+def get_most_current_amount(connection, btn_sku):
+    query = """
+    SELECT amount_after_change 
+    FROM Current_Amount_Items 
+    WHERE BTN_SKU = %s 
+    ORDER BY Change_Timestamp DESC 
+    LIMIT 1;
+    """
+    results = execute_read_query(connection, query, (btn_sku,))
     if results and results[0][0] is not None:
-        return results[0][0]  # Return the sum of Amount_Change
+        return results[0][0]  # Return the most recent amount_after_change
     else:
-        return 0  # Return 0 if no records are found, indicating no previous changes
+        return 0  # Return 0 if no records are found
 
 
-# parameterized queries for better security
 def adjust_item_amount(connection, btn_sku, amount_change):
     # Fetch current total before the change
-    current_total_amount = get_current_total_amount(connection, btn_sku)
+    current_total_amount = get_most_current_amount(connection, btn_sku)
     amount_before_change = current_total_amount
     # Calculate the total after applying the change
     amount_after_change = amount_before_change + amount_change
@@ -95,17 +103,8 @@ def adjust_item_amount(connection, btn_sku, amount_change):
     VALUES (%s, %s, %s, %s);
     """
     params = (btn_sku, amount_change, amount_before_change, amount_after_change)
-    cursor = connection.cursor()
-    try:
-        # Pass the query and the parameters separately
-        cursor.execute(query, params)
-        connection.commit()
-        print("Query successful")
-    except Error as err:
-        print(f"Error: '{err}'")
+    execute_query(connection, query, params)
 
-
-#  get adjustment history for a specific BTN_SKU
 def get_adjustment_history(connection, btn_sku):
     query = """
     SELECT BTN_SKU, amount_before_change, Amount_Change, amount_after_change, Change_Timestamp 
@@ -113,11 +112,7 @@ def get_adjustment_history(connection, btn_sku):
     WHERE BTN_SKU = %s
     ORDER BY Change_Timestamp ASC;
     """
-    cursor = connection.cursor()
-    cursor.execute(query, (btn_sku,))
-    history = cursor.fetchall()
-    return history
-
+    return execute_read_query(connection, query, (btn_sku,))
 
 # adjustment history log
 def display_history(connection, btn_sku):
@@ -136,22 +131,33 @@ def display_history(connection, btn_sku):
     else:
         st.write(f"No history found for BTN_SKU: {btn_sku}")
 
-
 # Page header
 st.title("Inventory Adjustment")
-btn_skus = get_all_btn_sku(conn)  # Fetch all BTN_SKU values
+btn_skus_with_description = get_all_btn_sku_and_description(conn)  # Fetch all BTN_SKU values with descriptions
+
+selected_item = st.selectbox("Select BTN_SKU", btn_skus_with_description)
+btn_sku = selected_item.split(' - ')[0]  # Extract BTN_SKU from the selected string
+
+# Fetch the most current amount for the selected BTN_SKU
+current_amount = get_most_current_amount(conn, btn_sku)
 
 with st.form("adjust_item_amount_form"):
     st.write("Adjust an Item's Amount")
-    btn_sku = st.selectbox("Select BTN_SKU", btn_skus)
+    st.write(f"Current Amount: {current_amount}")
     amount_change = st.number_input("Amount Change (positive to add, negative to remove)", step=1)
     submitted = st.form_submit_button("Adjust Amount")
     if submitted:
-        adjust_item_amount(conn, btn_sku, amount_change)
-        if amount_change > 0:
-            st.success(f"Added {amount_change} items successfully!")
+        if amount_change == 0:
+            st.error("Amount change cannot be zero.")
         else:
-            st.success(f"Removed {-amount_change} items successfully!")
+            try:
+                adjust_item_amount(conn, btn_sku, amount_change)
+                if amount_change > 0:
+                    st.success(f"Added {amount_change} items successfully!")
+                else:
+                    st.success(f"Removed {-amount_change} items successfully!")
+            except Error as e:
+                st.error(f"An error occurred: {e}")
 
 st.write("\n")
 st.write("\n")
@@ -161,7 +167,8 @@ st.write("\n")
 st.markdown("<h2 style='font-size: 24px;'>Select BTN_SKU to view history</h2>", unsafe_allow_html=True)
 
 st.markdown("***Changes are displayed from oldest at the top to most recent at the bottom of the log.***")
-btn_sku_history = st.selectbox("Select BTN_SKU (This label is for accessibility purposes)", btn_skus, key="history_selectbox", label_visibility="collapsed")
+btn_sku_history_with_description = st.selectbox("Select BTN_SKU for History (This label is for accessibility purposes)", btn_skus_with_description, key="history_selectbox_history", label_visibility="collapsed")
+btn_sku_history = btn_sku_history_with_description.split(' - ')[0]  # Extract BTN_SKU from the selected string
 
 display_history_button = st.button("Click to Display Adjustment History")
 if display_history_button:
@@ -176,8 +183,7 @@ if display_history_button:
             # Sleep to simulate loading time
             time.sleep(0.05)
         
-        # Now call the function to display the history
+        # call the function to display the history
         display_history(conn, btn_sku_history)
 
-    # ensure that the progress bar reaches 100%
     progress_bar.progress(100)
