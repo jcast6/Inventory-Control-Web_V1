@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import mysql.connector
-import plotly.express as px
 from mysql.connector import Error
 import datetime
 from dotenv import load_dotenv 
@@ -12,7 +11,7 @@ import time
 load_dotenv()
 
 # Set the page layout to wide mode
-# st.set_page_config(layout="wide")
+st.set_page_config(layout="wide")
 
 current_year = datetime.datetime.now().year
 years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
@@ -61,7 +60,6 @@ def execute_query(connection, query, params=None):
     except Error as err:
         print(f"Error: '{err}'")
 
-
 # get all BTN_SKU and Description values
 def get_all_btn_sku_and_description(connection):
     query = "SELECT BTN_SKU, Description FROM items_table;"
@@ -72,7 +70,6 @@ def get_all_btn_sku_and_description(connection):
         return [f"{result[0]} - {result[1]}" for result in results]
     else:
         return []  # Return an empty list if there are no results
-
 
 # fetch the most current total amount for a specific BTN_SKU
 def get_most_current_amount(connection, btn_sku):
@@ -89,25 +86,46 @@ def get_most_current_amount(connection, btn_sku):
     else:
         return 0  # Return 0 if no records are found
 
+# fetch the most current units_per_box for a specific BTN_SKU
+def get_units_per_box(connection, btn_sku):
+    query = """
+    SELECT units_per_box 
+    FROM Current_Amount_Items 
+    WHERE BTN_SKU = %s 
+    ORDER BY Change_Timestamp DESC 
+    LIMIT 1;
+    """
+    results = execute_read_query(connection, query, (btn_sku,))
+    if results and results[0][0] is not None:
+        return results[0][0]  # Return the most recent units_per_box
+    else:
+        return 0  # Return 0 if no records are found
 
-def adjust_item_amount(connection, btn_sku, amount_change):
+def adjust_item_amount(connection, btn_sku, amount_change, units_per_box):
     # Fetch current total before the change
     current_total_amount = get_most_current_amount(connection, btn_sku)
     amount_before_change = current_total_amount
     # Calculate the total after applying the change
     amount_after_change = amount_before_change + amount_change
     
+    # Debugging print statements
+    print(f"BTN_SKU: {btn_sku}")
+    print(f"Amount Change (boxes): {amount_change}")
+    print(f"Units Per Box: {units_per_box}")
+    print(f"Amount Before Change (boxes): {amount_before_change}")
+    print(f"Amount After Change (boxes): {amount_after_change}")
+    
     # parameterized query to prevent SQL injection
     query = """
-    INSERT INTO Current_Amount_Items (BTN_SKU, Amount_Change, amount_before_change, amount_after_change) 
-    VALUES (%s, %s, %s, %s);
+    INSERT INTO Current_Amount_Items (BTN_SKU, Amount_Change, amount_before_change, units_per_box, amount_after_change) 
+    VALUES (%s, %s, %s, %s, %s);
     """
-    params = (btn_sku, amount_change, amount_before_change, amount_after_change)
+    params = (btn_sku, amount_change, amount_before_change, units_per_box, amount_after_change)
     execute_query(connection, query, params)
 
 def get_adjustment_history(connection, btn_sku):
     query = """
-    SELECT BTN_SKU, amount_before_change, Amount_Change, amount_after_change, Change_Timestamp 
+    SELECT BTN_SKU, amount_before_change, Amount_Change, amount_after_change, units_per_box, Change_Timestamp 
     FROM Current_Amount_Items 
     WHERE BTN_SKU = %s
     ORDER BY Change_Timestamp ASC;
@@ -124,7 +142,7 @@ def display_history(connection, btn_sku):
             record = list(record)
             # Format timestamp
             record[-1] = record[-1].strftime("%Y-%m-%d %H:%M:%S")
-        history_df = pd.DataFrame(history_data, columns=['BTN_SKU', 'Before', 'Adjustment', 'New Item Count', 'Timestamp'])
+        history_df = pd.DataFrame(history_data, columns=['BTN_SKU', 'Before', 'Adjustment', 'New Item Count', 'Units Per Box', 'Timestamp'])
         st.write(f"Adjustment History for BTN_SKU: {btn_sku}")
         # Display the history as a table
         st.dataframe(history_df)
@@ -140,22 +158,37 @@ btn_sku = selected_item.split(' - ')[0]  # Extract BTN_SKU from the selected str
 
 # Fetch the most current amount for the selected BTN_SKU
 current_amount = get_most_current_amount(conn, btn_sku)
+# Fetch the most current units_per_box for the selected BTN_SKU
+current_units_per_box = get_units_per_box(conn, btn_sku)
+# Calculate total units
+total_units = current_amount * current_units_per_box
 
 with st.form("adjust_item_amount_form"):
     st.write("Adjust an Item's Amount")
-    st.write(f"Current Amount: {current_amount}")
-    amount_change = st.number_input("Amount Change (positive to add, negative to remove)", step=1)
+    st.write(f"Current Amount (boxes): {current_amount}")
+    st.write(f"Total Units: {total_units}")
+    amount_change = st.number_input("Amount Change (number of boxes, positive to add, negative to remove):", step=1)
+    units_per_box = st.number_input("Units Per Box:", step=1)
     submitted = st.form_submit_button("Adjust Amount")
     if submitted:
         if amount_change == 0:
             st.error("Amount change cannot be zero.")
         else:
             try:
-                adjust_item_amount(conn, btn_sku, amount_change)
+                # Adjust the item amount by the number of boxes and calculate the new total units
+                adjust_item_amount(conn, btn_sku, amount_change, units_per_box)
+                
                 if amount_change > 0:
-                    st.success(f"Added {amount_change} items successfully!")
+                    st.success(f"Added {amount_change} boxes successfully!")
                 else:
-                    st.success(f"Removed {-amount_change} items successfully!")
+                    st.success(f"Removed {-amount_change} boxes successfully!")
+                
+                # Update current amount and total units after the adjustment
+                current_amount = get_most_current_amount(conn, btn_sku)
+                current_units_per_box = get_units_per_box(conn, btn_sku)
+                total_units = current_amount * current_units_per_box
+                st.write(f"New Current Amount (boxes): {current_amount}")
+                st.write(f"New Total Units: {total_units}")
             except Error as e:
                 st.error(f"An error occurred: {e}")
 
