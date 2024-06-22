@@ -2,13 +2,13 @@
 Inven Control Version 1.1(Web Based)
 Created by: Juan Castaneda
 Created on: 1/05/24
-Description: Inven Control 1.1 is created using the Streamlit Framework. The application is designed to help with PLU label inventory mangement and 
-             to help analyze usage of PLU labels. The main goal is to simplify the tracking, removal, and addition of PLU labels spools used, with the. With Inven Control 1.1
+Description: Inven Control 1.1 is created using the Streamlit Framework. The application is designed to help with PLU label inventory management and 
+             to help analyze usage of PLU labels. The main goal is to simplify the tracking, removal, and addition of PLU labels spools used. With Inven Control 1.1
              the user can complete inventory count more efficiently and compare item counts to see monthly item usage trends, which in return can help 
              decide if the user is using more or less items. The inventory forecast page is still being designed to create a more accurate forecast to help
              with future PLU label needs.
 
-The software provided is a work in progress, with continuos updates applied. Please be sure to check for new versions on
+The software provided is a work in progress, with continuous updates applied. Please be sure to check for new versions on
 https://github.com/jcast6/
 
 """
@@ -29,6 +29,8 @@ st.set_page_config(layout="wide")
 
 current_year = datetime.datetime.now().year
 years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
+months = ['January', 'February', 'March', 'April', 'May', 'June', 
+          'July', 'August', 'September', 'October', 'November', 'December']
 
 # Load environment variables from .env file
 load_dotenv()
@@ -119,10 +121,19 @@ st.markdown("""
 st.title("PLU Inventory Dashboard 📊 ")
 st.markdown("**<span style='text-decoration: underline; ; font-size: 25px;'>Please select a year and month to see inventory data for📅🗓️:</span>**", unsafe_allow_html = True)
 
-selected_year = st.selectbox("What year is the data from📅:", years)
-months = ['January', 'February', 'March', 'April', 'May', 'June', 
-          'July', 'August', 'September', 'October', 'November', 'December']
-selected_month = st.selectbox("What Month is the data from🗓️:", months)
+# Use session state to remember the selected year and month
+if 'selected_year' not in st.session_state:
+    st.session_state.selected_year = current_year
+
+if 'selected_month' not in st.session_state:
+    st.session_state.selected_month = months[0]
+
+selected_year = st.selectbox("What year is the data from📅:", years, index=years.index(st.session_state.selected_year))
+selected_month = st.selectbox("What Month is the data from🗓️:", months, index=months.index(st.session_state.selected_month))
+
+# Update session state
+st.session_state.selected_year = selected_year
+st.session_state.selected_month = selected_month
 
 # Combine the selected month and year
 selected_month_year = f"{selected_month} {selected_year}"
@@ -243,12 +254,6 @@ else:
 st.markdown("**<span style='text-decoration: underline; font-size: 25px;'>Comparing item monthly usage📈📉:</span>**", unsafe_allow_html = True)
 num_months = st.number_input("Enter the number of months to compare (up to 12):", min_value = 1, max_value = 12, value = 2, step = 1)
 
-# current_year is defined
-current_year = 2024
-years = list(range(current_year - 10, current_year + 1))
-months = ['January', 'February', 'March', 'April', 'May', 'June', 
-          'July', 'August', 'September', 'October', 'November', 'December'] 
-
 # Month and year selection
 selected_months_years = []
 for i in range(num_months):
@@ -302,3 +307,4 @@ fig.update_yaxes(tick0 = 0, dtick = 10)
 
 # Display the chart
 st.plotly_chart(fig)
+
