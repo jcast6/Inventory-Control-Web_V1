@@ -21,6 +21,7 @@ import datetime
 from mysql.connector import Error
 from dotenv import load_dotenv 
 import os 
+from dateutil.relativedelta import relativedelta
 import plotly.graph_objects as pg
 # import streamlit.components.v1 as components
 # import numpy as np
@@ -63,7 +64,7 @@ def fetch_data(selected_month_year):
             data = cursor.fetchall()
             df = pd.DataFrame(data, columns=columns)
             print("Query successful, fetched data:")
-            print(df.head())  # Print first few rows to debug
+            print(df.head())
             return df
         finally:
             cursor.close()
@@ -100,14 +101,17 @@ def fetch_items_BTN_SKU():
                 connection.close()
     else:
         return []
+    
 
-col1, _ = st.columns([1, 10])  # width of the column 
+col1, _ = st.columns([1, 10])   
 with col1:
     st.image("github_projects/borton_fruit_logo.png", width = 500, use_column_width = False,
-             output_format = "auto",  # Output format of the image
-             channels = "RGB",  # Channels for the image
+             output_format = "auto", 
+             channels = "RGB", 
              
              )
+
+st.title("PLU Inventory Dashboard 📊 ")
     
 st.markdown("""
     <div style='text-align: left; color: gray; font-size: 18px;'>
@@ -118,8 +122,9 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
     
-st.title("PLU Inventory Dashboard 📊 ")
-st.markdown("**<span style='text-decoration: underline; ; font-size: 25px;'>Please select a year and month to see inventory data for📅🗓️:</span>**", unsafe_allow_html = True)
+
+st.markdown("<span class = 'custom-underline' style = 'font-size: 25px;'>**Please select a year and month to see inventory data for📅🗓️:**</span>", unsafe_allow_html = True)  
+
 
 # Use session state to remember the selected year and month
 if 'selected_year' not in st.session_state:
@@ -128,8 +133,8 @@ if 'selected_year' not in st.session_state:
 if 'selected_month' not in st.session_state:
     st.session_state.selected_month = months[0]
 
-selected_year = st.selectbox("What year is the data from📅:", years, index=years.index(st.session_state.selected_year))
-selected_month = st.selectbox("What Month is the data from🗓️:", months, index=months.index(st.session_state.selected_month))
+selected_year = st.selectbox("What year is the data from📅: ", years, index = years.index(st.session_state.selected_year))
+selected_month = st.selectbox("What Month is the data from🗓️: ", months, index = months.index(st.session_state.selected_month))
 
 # Update session state
 st.session_state.selected_year = selected_year
@@ -144,7 +149,7 @@ df = fetch_data(selected_month_year)
 # Search Bar asking user to enter either item BTN_SKU or Description
 search_query = st.text_input("Enter BTN_SKU or Description to search for item📦:")
 if search_query:
-    search_results = df[(df['BTN_SKU'] == search_query) | (df['Description'].str.contains(search_query, case=False, na=False))]
+    search_results = df[(df['BTN_SKU'] == search_query) | (df['Description'].str.contains(search_query, case = False, na = False))]
     if search_results.empty:
         st.write("Item not found in inventory.")
     else:
@@ -158,37 +163,53 @@ if search_query:
         st.success("Item found!")
         st.write("Item Data:")
         st.dataframe(search_results)
-st.dataframe(df, use_container_width=True)
+st.dataframe(df, use_container_width = True)
 
 st.markdown("\n")
 st.markdown("\n")
 st.markdown("\n")
 
-st.markdown("**<span style='text-decoration: underline; font-size: 25px;'>Bar Graph of Item Count📉 :</span>**", unsafe_allow_html = True)
-st.markdown("This bar chart displays the count of each item in the inventory. The count is categorized by whether the item is counted as single spools or as bundles/boxes.")
-st.markdown("You can choose in the drop down which items were counted as spools and not bundles/boxes style count.")
+# html and css for underline color
+st.markdown("""
+<style>
+.custom-underline {
+    text-decoration: none;
+    position: relative;
+}
+.custom-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    border-bottom: 2px solid green; /* for changing underline color */
+    pointer-events: none;
+}
+</style>
+
+<span class = 'custom-underline' style = 'font-size: 25px;'> **Bar Graph of Item Count**📉 :</span>
+""", unsafe_allow_html = True)
+
+st.markdown("This bar chart displays the count of each item in the inventory.")
 
 # User selection for count method
-all_items = df['Description'].unique()  # Or use 'BTN_SKU' column if better for you
+all_items = df['Description'].unique()  # Or use 'BTN_SKU' column if better 
 
-# multi select dropdown, can select multiple items from the list 'all_items'
-selected_items_spools = st.multiselect('Select Items to Count as Single Spools', all_items, default = [])
 
-# Update DataFrame with column 'Count_Method', check if item's description is in the list of 'selected_items_spools', if the description is in the list, 
 # the count method is set to 'Spools' if not set it defaults to 'Bundles/Boxes'. 
-df['Count_Method'] = df['Description'].apply(lambda x: 'Spools' if x in selected_items_spools else 'Bundles/Boxes')
+df['Count_Method'] = df['is_roll'].apply(lambda x: 'Rolls' if x else 'Bundles/Boxes')
 
-# Bar graph for each item
+# Bar graph for each item count
 fig_bar = px.bar(df, x = 'Description', y = 'Bundles_Boxes_Spools', color = 'Count_Method', 
-                 title=f'Inventory Count for Each Item - {selected_month}',
-                 labels={'Bundles_Boxes_Spools': 'Count'})
+                 title = f'Inventory Count for Each Item - {selected_month}',
+                 labels = {'Bundles_Boxes_Spools': 'Count'})
 fig_bar.update_layout(height = 600, xaxis_tickangle = -45)
 st.plotly_chart(fig_bar, use_container_width = True)
 
 # Prepare data for the new interactive bar chart
 df_grouped = df.groupby('item_type').agg(
-    Total_Space = pd.NamedAgg(column='Bundles_Boxes_Spools', aggfunc = 'sum'),
-    Item_List=pd.NamedAgg(column='Description', aggfunc = lambda x: '<br>'.join(x))
+    Total_Space = pd.NamedAgg(column = 'Bundles_Boxes_Spools', aggfunc = 'sum'),
+    Item_List = pd.NamedAgg(column = 'Description', aggfunc = lambda x: '<br>'.join(x))
 ).reset_index()
 
 st.write("\n")
@@ -211,10 +232,9 @@ if not df.empty:
 
     # Total space for calculating percentages
     total_space = df_grouped['Total_Space'].sum()
-    
-    st.markdown("<span style='text-decoration: underline; font-size: 25px;'>**Bar Graph for Inventory Space Distribution📊 :**</span>", unsafe_allow_html = True)
-
     # bar chart with the updated data frame
+    st.markdown("<span class = 'custom-underline' style = 'font-size: 25px;'>**Bar Graph for Inventory Space Distribution📊 :**</span>", unsafe_allow_html = True)  
+
     fig_type_space = px.bar(df_grouped, x = 'item_type', y = 'Total_Space',
                             color = 'item_type',  
                             hover_data = {'Item_List'},
@@ -223,19 +243,19 @@ if not df.empty:
                             height = 600)
     fig_type_space.update_layout(xaxis_tickangle = -45)
 
-    # Display the figure
-    st.plotly_chart(fig_type_space, use_container_width=True)
+    st.plotly_chart(fig_type_space, use_container_width = True)
 
-     # display the metrics under the bar chart
+     # Metrics
     st.write("\n")
     st.markdown("**Inventory Space Metrics**")
 
     # Use columns to display each metric side by side
     cols = st.columns(len(df_grouped))
     for col, (index, row) in zip(cols, df_grouped.iterrows()):
-        percentage = (row['Total_Space'] / total_space) * 100  # Calculate the percentage
+        # Calculate the percentage each item type, (in inventory)
+        percentage = (row['Total_Space'] / total_space) * 100 
         # markdown to add a hover text over the metric that shows the item list
-        metric_label_html = f"<span title='{row['Item_List']}' style='text-decoration: underline;'>{row['item_type']}</span>"
+        metric_label_html = f"<span title = '{row['Item_List']}' style = 'text-decoration: underline;'>{row['item_type']}</span>"
         col.markdown(metric_label_html, unsafe_allow_html = True)
         st.write(
                 """
@@ -247,32 +267,35 @@ if not df.empty:
                 """,
                 unsafe_allow_html = True,
         )
-        col.metric(label="Inventory Space Used", value = f"{row['Total_Space']:.2f}", delta = f"{percentage:.2f}%", delta_color = 'off')
+        col.metric(label = "Inventory Space Used", value = f"{row['Total_Space']:.2f}", delta = f"{percentage:.2f}%", delta_color = 'off')
 else:
     st.error("No data available for the selected period.")
 
-st.markdown("**<span style='text-decoration: underline; font-size: 25px;'>Comparing item monthly usage📈📉:</span>**", unsafe_allow_html = True)
+
+###########
+st.markdown("<span class = 'custom-underline' style = 'font-size: 25px;'> **Comparing item monthly usage📈📉**</span>", unsafe_allow_html = True)
 num_months = st.number_input("Enter the number of months to compare (up to 12):", min_value = 1, max_value = 12, value = 2, step = 1)
 
-# Month and year selection
+# Month and year selection with different prefilled values
 selected_months_years = []
+default_months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                  'July', 'August', 'September', 'October', 'November', 'December']
+
+#pre select months/year to compare
 for i in range(num_months):
-    selected_year = st.selectbox(f"Select year {i+1}📅:", years, key=f'year_selection_{i}')
-    selected_month = st.selectbox(f"Select month {i+1}🗓️:", months, key=f'month_selection_{i}')
+    selected_year = st.selectbox(f"Select year {i+1}📅:", years, key = f'year_selection_{i}', index=years.index(2024))
+    selected_month = st.selectbox(f"Select month {i+1}🗓️:", months, key = f'month_selection_{i}', index=months.index(default_months[i % len(default_months)]))
     selected_months_years.append((selected_month, selected_year))
 
-# Define a list of colors for visualization
+
 color_palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
-# Fetch all items from database 
 all_items = fetch_items_BTN_SKU()
+preselected_items = ['BSKU-5230', 'BSKU-5265', 'BSKU-5185'] # pre-selected items for user preview
+selected_items = st.multiselect("Select item(s)📦:", all_items, key = 'item_selection', default = preselected_items)
 
-# Item selection with multiselect
-selected_items = st.multiselect("Select item(s)📦:", all_items, key = 'item_selection')
-
-
-# Fetch and process data for each selected item
+# process data for each selected item
 data_results = []
 for month, year in selected_months_years:
     month_year = f"{month} {year}"
@@ -307,4 +330,3 @@ fig.update_yaxes(tick0 = 0, dtick = 10)
 
 # Display the chart
 st.plotly_chart(fig)
-
