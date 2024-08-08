@@ -26,7 +26,12 @@ import plotly.graph_objects as pg
 # import streamlit.components.v1 as components
 # import numpy as np
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout = "wide", initial_sidebar_state = "collapsed")
+st.markdown("""
+<div style="text-align: left; padding: 10px; border-radius: 5px;">
+    <span style="position: relative; left: -50px; top: -65px; font-size: 100">↖️ Click the arrow for more options!</span> 
+</div>
+""", unsafe_allow_html=True)
 
 current_year = datetime.datetime.now().year
 years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
@@ -122,9 +127,27 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
     
+#st.markdown("""<hr style = "height: 2px; border: none; color: green; background-color: green; "/> """, unsafe_allow_html = True)
+# st.markdown("""<span class = 'custom-underline' style = "font-size: 25px; >**Please select a year and month to see inventory data for📅🗓️:**</span>""", unsafe_allow_html = True)  
+st.markdown("""
+<style>
+.custom-underline {
+    text-decoration: none;
+    position: relative;
+}
+.custom-underline::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    border-bottom: 2px solid green; /* for changing underline color */
+    pointer-events: none;
+}
+</style>
 
-st.markdown("<span class = 'custom-underline' style = 'font-size: 25px;'>**Please select a year and month to see inventory data for📅🗓️:**</span>", unsafe_allow_html = True)  
-
+<span class='custom-underline' style='font-size: 25px; padding-top: 50px;'>**Please select a year and month to see inventory data for📅🗓️:**</span>
+""", unsafe_allow_html=True)
 
 # Use session state to remember the selected year and month
 if 'selected_year' not in st.session_state:
@@ -169,6 +192,7 @@ st.markdown("\n")
 st.markdown("\n")
 st.markdown("\n")
 
+# st.markdown("Item count in inventory at the end of each month.")
 # html and css for underline color
 st.markdown("""
 <style>
@@ -187,10 +211,8 @@ st.markdown("""
 }
 </style>
 
-<span class = 'custom-underline' style = 'font-size: 25px;'> **Bar Graph of Item Count**📉 :</span>
-""", unsafe_allow_html = True)
-
-st.markdown("This bar chart displays the count of each item in the inventory.")
+<span class='custom-underline' style='font-size: 25px; padding-top: 50px;'>**Bar Graph of Item Count**📉 :</span>
+""", unsafe_allow_html=True)
 
 # User selection for count method
 all_items = df['Description'].unique()  # Or use 'BTN_SKU' column if better 
@@ -257,10 +279,9 @@ if not df.empty:
         # markdown to add a hover text over the metric that shows the item list
         metric_label_html = f"<span title = '{row['Item_List']}' style = 'text-decoration: underline;'>{row['item_type']}</span>"
         col.markdown(metric_label_html, unsafe_allow_html = True)
-        st.write(
-                """
+        st.write("""
                 <style>
-                [data-testid="stMetricDelta"] svg {
+                [data-testid = "stMetricDelta"] svg {
                     display: none;
                 }
                 </style>
@@ -283,8 +304,8 @@ default_months = ['January', 'February', 'March', 'April', 'May', 'June',
 
 #pre select months/year to compare
 for i in range(num_months):
-    selected_year = st.selectbox(f"Select year {i+1}📅:", years, key = f'year_selection_{i}', index=years.index(2024))
-    selected_month = st.selectbox(f"Select month {i+1}🗓️:", months, key = f'month_selection_{i}', index=months.index(default_months[i % len(default_months)]))
+    selected_year = st.selectbox(f"Select year {i+1}📅:", years, key = f'year_selection_{i}', index = years.index(2024))
+    selected_month = st.selectbox(f"Select month {i+1}🗓️:", months, key = f'month_selection_{i}', index = months.index(default_months[i % len(default_months)]))
     selected_months_years.append((selected_month, selected_year))
 
 
@@ -292,7 +313,7 @@ color_palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
 all_items = fetch_items_BTN_SKU()
-preselected_items = ['BSKU-5230', 'BSKU-5265', 'BSKU-5185'] # pre-selected items for user preview
+preselected_items = ['BSKU-5230', 'BSKU-5265', 'BSKU-5185'] # pre-selected items BTN_SKU for user preview
 selected_items = st.multiselect("Select item(s)📦:", all_items, key = 'item_selection', default = preselected_items)
 
 # process data for each selected item
@@ -329,4 +350,4 @@ fig.update_layout(
 fig.update_yaxes(tick0 = 0, dtick = 10)
 
 # Display the chart
-st.plotly_chart(fig)
+st.plotly_chart(fig, use_container_width = True)
