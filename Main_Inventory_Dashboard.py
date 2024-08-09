@@ -29,7 +29,7 @@ import plotly.graph_objects as pg
 st.set_page_config(layout = "wide", initial_sidebar_state = "collapsed")
 st.markdown("""
 <div style="text-align: left; padding: 10px; border-radius: 5px;">
-    <span style="position: relative; left: -50px; top: -65px; font-size: 100">↖️ Click the arrow for more options!</span> 
+    <span style="position: relative; left: -50px; top: -65px; font-size: 100">↖️ Click the here for more options!</span> 
 </div>
 """, unsafe_allow_html=True)
 
@@ -318,36 +318,73 @@ selected_items = st.multiselect("Select item(s)📦:", all_items, key = 'item_se
 
 # process data for each selected item
 data_results = []
+rolls_items = [] 
+
 for month, year in selected_months_years:
     month_year = f"{month} {year}"
     for item in selected_items:
-        query2 = "SELECT Month, Bundles_Boxes_Spools FROM items_table WHERE BTN_SKU = %s AND Month = %s"
+        query2 = "SELECT Month, Bundles_Boxes_Spools, is_roll FROM items_table WHERE BTN_SKU = %s AND Month = %s"
         data = execute_query(db_connection, query2, (item, month_year))
-        data_results.append({'MonthYear': month_year, 'Item': item, 'Value': data[0]['Bundles_Boxes_Spools'] if data else 0})
+        if data:
+            is_roll = data[0]['is_roll']
+            data_results.append({
+                'MonthYear': month_year,
+                'Item': item,
+                'Value': data[0]['Bundles_Boxes_Spools'],
+                'IsRoll': is_roll
+            })
+            if is_roll:
+                rolls_items.append(item)
+        else:
+            data_results.append({
+                'MonthYear': month_year,
+                'Item': item,
+                'Value': 0,
+                'IsRoll': False
+            })
 
-# insert extracted results into a dataframe
+
+# Insert extracted results into a dataframe
 df_results = pd.DataFrame(data_results)
 
 fig = pg.Figure()
 for item in selected_items:
     df_filtered = df_results[df_results['Item'] == item]
-    #fig.add_trace(pg.Bar(name = item,
-    fig.add_trace(pg.Scatter(name=item, 
-                         x = df_filtered['MonthYear'], 
-                         y = df_filtered['Value'], 
-                         marker_color = color_palette[selected_items.index(item) % len(color_palette)]
-                         ))
+
+    # Prepare hover text based on whether the item is counted as rolls
+    df_filtered['HoverText'] = df_filtered.apply(
+        lambda row: f"Item: {item}<br>Month/Year: {row['MonthYear']}<br>" +
+                    (f"Rolls: {row['Value']}" if item in rolls_items else f"Bundles/Boxes: {row['Value']}"),
+        axis = 1
+    )
+
+    # Define marker style
+    if item in rolls_items:
+        marker_style = dict(color=color_palette[selected_items.index(item) % len(color_palette)], symbol="star")
+        line_style = dict(width = 3)
+    else:
+        marker_style = dict(color=color_palette[selected_items.index(item) % len(color_palette)])
+        line_style  = dict(width = 4)
+
+    # Add trace with custom hover text
+    fig.add_trace(pg.Scatter(
+        name=item,
+        x = df_filtered['MonthYear'],
+        y = df_filtered['Value'],
+        mode = 'lines+markers',
+        marker = marker_style,
+        line = line_style,
+        text = df_filtered['HoverText'], 
+        hoverinfo = 'text' 
+    ))
 
 fig.update_layout(
     title = 'Monthly data comparison for selected item(s)',
     xaxis_title = "Month/Year",
     yaxis_title = "Bundles/Boxes/Spools",
-    #barmode = 'group',
     height = 800,
 )
 
-# Update y-axis increment to 5
 fig.update_yaxes(tick0 = 0, dtick = 10)
 
-# Display the chart
 st.plotly_chart(fig, use_container_width = True)
