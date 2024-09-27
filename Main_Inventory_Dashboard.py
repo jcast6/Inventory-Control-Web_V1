@@ -107,6 +107,27 @@ def fetch_items_BTN_SKU():
     else:
         return []
     
+# get all items BTN_SKU and description only
+def fetch_items_BTN_SKU_description():
+    connection = create_connection()
+    if connection:
+        try:
+            with connection.cursor() as cursor:
+                query = "SELECT DISTINCT BTN_SKU, Description FROM items_table" 
+                cursor.execute(query)
+                items = cursor.fetchall()
+                # Combine BTN_SKU and Description for display in dropdown
+                return [f"{item[0]} - {item[1]}" for item in items]  # Adjust indexing if necessary based on query
+        except Error as err:
+            print(f"Error: '{err}'")
+            return []
+        finally:
+            if connection:
+                connection.close()
+    else:
+        return []
+
+    
 
 col1, _ = st.columns([1, 10])   
 with col1:
@@ -217,7 +238,6 @@ st.markdown("""
 # User selection for count method
 all_items = df['Description'].unique()  # Or use 'BTN_SKU' column if better 
 
-
 # the count method is set to 'Spools' if not set it defaults to 'Bundles/Boxes'. 
 df['Count_Method'] = df['is_roll'].apply(lambda x: 'Rolls' if x else 'Bundles/Boxes')
 
@@ -293,7 +313,6 @@ else:
     st.error("No data available for the selected period.")
 
 
-###########
 st.markdown("<span class = 'custom-underline' style = 'font-size: 25px;'> **Comparing item monthly usage📈📉**</span>", unsafe_allow_html = True)
 num_months = st.number_input("Enter the number of months to compare (up to 12):", min_value = 1, max_value = 12, value = 2, step = 1)
 
@@ -313,7 +332,7 @@ color_palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
 
 all_items = fetch_items_BTN_SKU()
-preselected_items = ['BSKU-5230', 'BSKU-5265', 'BSKU-5185'] # pre-selected items BTN_SKU for user preview
+preselected_items = ['BSKU-5230', 'BSKU-5350', 'BSKU-5185'] # pre-selected items BTN_SKU for user preview
 selected_items = st.multiselect("Select item(s)📦:", all_items, key = 'item_selection', default = preselected_items)
 
 # process data for each selected item
