@@ -7,10 +7,12 @@ from dotenv import load_dotenv
 import os
 import time
 
+# Load environment variables
 load_dotenv()
+
 st.set_page_config(layout="wide")
 current_year = datetime.datetime.now().year
-years = list(range(current_year - 10, current_year + 1))
+years = list(range(current_year - 10, current_year + 1))  # Last 10 years and current year
 
 def create_connection():
     try:
@@ -74,8 +76,8 @@ def get_most_current_amount(connection, btn_sku):
     if results and results[0][0] is not None:
         return results[0][0]  # Return the most recent amount_after_change
     else:
-        return 0  # no records found
-    
+        return 0  # Return 0 if no records are found
+
 def get_total_units_and_boxes(connection, btn_sku):
     query = """
     SELECT SUM(Amount_Change * units_per_box) as total_units,
@@ -84,46 +86,45 @@ def get_total_units_and_boxes(connection, btn_sku):
     WHERE BTN_SKU = %s;
     """
     results = execute_read_query(connection, query, (btn_sku,))
-    
-    # if not current boxes or units for selected item, default will be 0 for boxes and units
     if results and results[0] is not None:
-        total_units = results[0][0] if results[0][0] is not None else 0
-        total_boxes = results[0][1] if results[0][1] is not None else 0
-        return total_units, total_boxes
+        return results[0][0], results[0][1]  # Return total units and total boxes
     else:
-        return 0, 0  # 0 no records are found
+        return 0, 0  # Return 0 if no records are found
 
 def adjust_item_amount(connection, btn_sku, amount_change, units_per_box, is_roll):
-    # Fetch current total before the change, for boxes and rolls
+    # Fetch current total before the change, for boxes or rolls
     current_total_amount = get_most_current_amount(connection, btn_sku)
     amount_before_change = current_total_amount
+    # Calculate the total after applying the change
     amount_after_change = amount_before_change + amount_change
+    # Fetch previous total units and boxes
     previous_total_units, previous_total_boxes = get_total_units_and_boxes(connection, btn_sku)
     
-    # add new number of boxes to current amount
+    # Ensure to use the correct previous total boxes, not adding them repeatedly
     new_total_boxes = previous_total_boxes + amount_change
 
-    # calculate new total units, if adding/subtracting boxes, we calculate the change to the total units
+    # Calculate new total units correctly
+    # If you are adding/subtracting boxes, we calculate the change to the total units
     new_total_units = previous_total_units + (amount_change * units_per_box)
 
-    # Recalculate the average units per box
+    # Recalculate the average units per box correctly
     if new_total_boxes > 0:
         new_average_units_per_box = round(new_total_units / new_total_boxes)
     else:
         new_average_units_per_box = 0
 
-    #######################################################################
-    # Prints to terminal for verification, do not edit!                  ##
-    print(f"BTN_SKU: {btn_sku}")                                         ##
-    print(f"Amount Change (boxes/rolls): {amount_change}")               ##
-    print(f"Units Per Box/Roll: {units_per_box}")                        ## 
-    print(f"Amount Before Change (boxes/rolls): {amount_before_change}") ##
-    print(f"Amount After Change (boxes/rolls): {amount_after_change}")   ##
-    print(f"New Total Units: {new_total_units}")                         ##
-    print(f"New Average Units Per Box: {new_average_units_per_box}")     ##
-    print(f"Is Roll: {is_roll}")                                         ## 
-    #######################################################################
+    #### Prints to terminal for verification, do not edit! ####
+    print(f"BTN_SKU: {btn_sku}")
+    print(f"Amount Change (boxes/rolls): {amount_change}")
+    print(f"Units Per Box/Roll: {units_per_box}")
+    print(f"Amount Before Change (boxes/rolls): {amount_before_change}")
+    print(f"Amount After Change (boxes/rolls): {amount_after_change}")
+    print(f"New Total Units: {new_total_units}")
+    print(f"New Average Units Per Box: {new_average_units_per_box}")
+    print(f"Is Roll: {is_roll}")
+    ###########################################################
 
+    # Parameterized query to prevent SQL injection
     query = """
     INSERT INTO Current_Amount_Items (BTN_SKU, Amount_Change, amount_before_change, units_per_box, new_total_units, amount_after_change, is_roll) 
     VALUES (%s, %s, %s, %s, %s, %s, %s);
@@ -138,6 +139,7 @@ def adjust_item_amount(connection, btn_sku, amount_change, units_per_box, is_rol
     WHERE BTN_SKU = %s;
     """
     execute_query(connection, update_items_table_query, (is_roll, btn_sku))
+
 
 def get_adjustment_history(connection, btn_sku):
     query = """
@@ -175,7 +177,7 @@ btn_sku = selected_item.split(' - ')[0]  # Extract BTN_SKU from the selected str
 # Fetch the most current amount for the selected BTN_SKU
 current_amount = get_most_current_amount(conn, btn_sku)
 previous_total_units, previous_total_boxes = get_total_units_and_boxes(conn, btn_sku)
-if previous_total_boxes != 0:
+if previous_total_units is not None and previous_total_boxes is not None and previous_total_boxes != 0:
     current_average_units_per_box = previous_total_units / previous_total_boxes
 else:
     current_average_units_per_box = 0
@@ -191,7 +193,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Adjustment form start
+# Form logic for adjustment
 with st.form("adjust_item_amount_form"):
     header1 = "Adjust An Item's Amount: "
     header1_font_size = 25
@@ -207,18 +209,11 @@ with st.form("adjust_item_amount_form"):
                 unsafe_allow_html=True)
     
     st.write(f"Current Amount (boxes/rolls): {current_amount}")
-    
-    # Ensure we check for valid previous total boxes to avoid division by zero
-    if previous_total_boxes > 0:
-        current_average_units_per_box = previous_total_units / previous_total_boxes
-    else:
-        current_average_units_per_box = 0
-    
     st.write(f"Current Average Units Per Box/Roll: {current_average_units_per_box}")
 
     amount_change = st.number_input("Amount Change (number of boxes/rolls, positive to add, negative to remove):", step=1)
     is_roll = st.checkbox("Is this item a roll?", value=False)
-    units_per_box = st.number_input("Units Per Box/Roll:", min_value=1, step=1)
+    units_per_box = st.number_input("Units Per Box/Roll(Use average from boxes on new pallet or shipment):", min_value=1, step=1)
 
     submitted = st.form_submit_button("Adjust Amount")
 
@@ -229,7 +224,7 @@ with st.form("adjust_item_amount_form"):
             st.error("Units per box/roll cannot be zero.")
         else:
             try:
-                # adjust item amount and recalculate the average
+                # Adjust item amount and recalculate the average
                 adjust_item_amount(conn, btn_sku, amount_change, units_per_box, is_roll)
                 
                 if amount_change > 0:
@@ -241,9 +236,9 @@ with st.form("adjust_item_amount_form"):
                 current_amount = get_most_current_amount(conn, btn_sku)
                 previous_total_units, previous_total_boxes = get_total_units_and_boxes(conn, btn_sku)
                 
-                # calculate the new average after the change and handle division by zero(units with no current data)
+                # Properly calculate the new average after the change
                 if previous_total_boxes > 0:
-                    new_average_units_per_box = round(previous_total_units / previous_total_boxes)
+                    new_average_units_per_box = previous_total_units / previous_total_boxes
                 else:
                     new_average_units_per_box = 0
                     
