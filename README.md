@@ -32,5 +32,10 @@ This page is used to adjust inventory counts of an item. If a employee removes a
 You can view the adjustment history for an item in the next section of the page.
 ![pic10](https://github.com/user-attachments/assets/b07bb9bb-2a13-440e-91ef-56149b0fdab9)
 
+# New End of Month Count
+This page is dedicated to inputting monthly data for the current inventory. The user will input the year and month, followed by selecting the BTN_SKU they want to enter data for. When the BTN_SKU is selected the item details(Description, Type, Count Details...) will be fullfilled automatically, depending if the item has a current amount in stock. If there is no amount in stock for an item the default is zero. Items can be classified as Rolls/Spools.
+
+
+
 
 
