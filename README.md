@@ -25,6 +25,6 @@ You can compare item inventory for one or multiple items from different years or
 ![pic7](https://github.com/user-attachments/assets/315cf255-a165-466b-8c66-a12ebfdc1c31)
 
 ### Add or Remove Item 
-This page is used to adjust inventory counts of an item. If a employee removes an item for inventory, that employee will select the BTN_SKU, once selected, the inventory data of that item will appear. The employee has to enter how many boxes to add or remove, and the total units in the box of that item. The 'Current Average Units Per Box/Roll' changes everytime an item is added or removed, this is to help get a more accurate count 
+This page is used to adjust inventory counts of an item. If a employee removes an item for inventory, that employee will select the BTN_SKU, once selected, the inventory data of that item will appear. The employee has to enter how many boxes to add or remove, and the total units in the box of that item. The 'Current Average Units Per Box/Roll' changes everytime an item is added or removed, this is to help get a more accurate count.  
 ![pic8](https://github.com/user-attachments/assets/ec4e7ea1-5221-4c18-8fd7-823c97e04311)
 
