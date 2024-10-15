@@ -313,6 +313,9 @@ else:
     st.error("No data available for the selected period.")
 
 
+import pandas as pd
+import plotly.graph_objects as pg
+
 st.markdown("<span class = 'custom-underline' style = 'font-size: 25px;'> **Comparing item monthly usage📈📉**</span>", unsafe_allow_html = True)
 num_months = st.number_input("Enter the number of months to compare (up to 12):", min_value = 1, max_value = 12, value = 2, step = 1)
 
@@ -321,12 +324,14 @@ selected_months_years = []
 default_months = ['January', 'February', 'March', 'April', 'May', 'June', 
                   'July', 'August', 'September', 'October', 'November', 'December']
 
-#pre select months/year to compare
+# Pre-select months/year to compare
 for i in range(num_months):
     selected_year = st.selectbox(f"Select year {i+1}📅:", years, key = f'year_selection_{i}', index = years.index(2024))
-    selected_month = st.selectbox(f"Select month {i+1}🗓️:", months, key = f'month_selection_{i}', index = months.index(default_months[i % len(default_months)]))
+    selected_month = st.selectbox(f"Select month {i+1}🗓️:", default_months, key = f'month_selection_{i}', index = i % len(default_months))
     selected_months_years.append((selected_month, selected_year))
 
+# Sort selected months/years by year and month
+sorted_months_years = sorted(selected_months_years, key=lambda x: (x[1], default_months.index(x[0])))
 
 color_palette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', 
                  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
@@ -335,11 +340,11 @@ all_items = fetch_items_BTN_SKU()
 preselected_items = ['BSKU-5230', 'BSKU-5350', 'BSKU-5185'] # pre-selected items BTN_SKU for user preview
 selected_items = st.multiselect("Select item(s)📦:", all_items, key = 'item_selection', default = preselected_items)
 
-# process data for each selected item
+# Process data for each selected item
 data_results = []
 rolls_items = [] 
 
-for month, year in selected_months_years:
+for month, year in sorted_months_years:
     month_year = f"{month} {year}"
     for item in selected_items:
         query2 = "SELECT Month, Bundles_Boxes_Spools, is_roll FROM items_table WHERE BTN_SKU = %s AND Month = %s"
@@ -361,7 +366,6 @@ for month, year in selected_months_years:
                 'Value': 0,
                 'IsRoll': False
             })
-
 
 # Insert extracted results into a dataframe
 df_results = pd.DataFrame(data_results)
@@ -407,3 +411,4 @@ fig.update_layout(
 fig.update_yaxes(tick0 = 0, dtick = 10)
 
 st.plotly_chart(fig, use_container_width = True)
+
