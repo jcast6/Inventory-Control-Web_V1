@@ -1,7 +1,10 @@
 # Inventory-Control-Web_V1
 
-Inventory Control WebV1 is a web based inventory reporting dashboard. This application displays plots based on data from a MySQL database. 
-I used the Streamlit Framework with Python to create an interactive and accurate data reporting application.
+Inventory-Control-Web: Inventory Management Application — a tool designed to bring accuracy and efficiency to inventory processes. Built using Python and Streamlit, this application integrates with a MySQL database to provide a reliable solution for inventory tracking and management.
+
+Using MySQL for data storage, the application provides accurate inventory data. Streamlit, combined with Python’s versatility, offers an interactive interface that makes managing inventory simple and effective. From adding new items to adjusting current stocks, every interaction is designed to improve accuracy, reduce errors, and give you a clear overview of your inventory.
+
+This system ensures data integrity and reliability, offering users visibility into current stock levels, average units per box, and recent adjustments. With automated data calculations and historical tracking, the application helps maintain accurate inventory records, allowing you to make informed decisions quickly. Whether you're adjusting quantities or viewing item history, this solution delivers clarity and confidence in your inventory data.
 
 ![pic1](https://github.com/user-attachments/assets/7b0d634a-c079-4695-b433-302805871724)
 
